@@ -216,7 +216,7 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS
+# YT-DLP OPTIONS - FIXED FOR AGE RESTRICTION
 # ============================================================
 yt_opts = {
     "format": "bestaudio/best",
@@ -224,16 +224,12 @@ yt_opts = {
     "no_warnings": True,
     "noplaylist": True,
     "extract_flat": False,
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    },
+    "age_limit": 99,  # Allows age-restricted content
     "extractor_args": {
         "youtube": {
             "skip": ["hls", "dash"],
-            "player_client": ["android", "web"],
+            "player_client": ["android", "ios"],  # iOS client bypasses many restrictions
+            "player_skip": ["webpage"],  # Skip webpage extraction, use API directly
         }
     }
 }
@@ -263,7 +259,7 @@ def create_source(url: str):
             
     except yt_dlp.utils.DownloadError as e:
         error_msg = str(e)
-        if "Sign in to confirm" in error_msg:
+        if "Sign in to confirm" in error_msg or "age" in error_msg.lower():
             raise RuntimeError("YouTube age restriction - bot cannot play this video")
         elif "Video unavailable" in error_msg:
             raise RuntimeError("Video is unavailable (private/deleted/region blocked)")
@@ -543,6 +539,25 @@ async def slash_nowplaying(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 # ============================================================
+# PRIVACY POLICY COMMAND
+# ============================================================
+
+@bot.tree.command(name="privacy", description="View the bot's privacy policy")
+async def slash_privacy(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="Privacy Policy - S1mplicity",
+        description="This bot does not store any user data persistently.",
+        color=CYBERPUNK_COLOR
+    )
+    embed.add_field(name="📊 Data Collected", value="User IDs, Server IDs, Command text, Voice connection status", inline=False)
+    embed.add_field(name="💾 Data Storage", value="**No persistent storage.** All data is temporary and lost on bot restart.", inline=False)
+    embed.add_field(name="🎵 Audio Content", value="No audio/video is downloaded or stored. Streaming only from YouTube.", inline=False)
+    embed.add_field(name="🔒 Data Sharing", value="We do not sell, share, or transfer your data to any third parties.", inline=False)
+    embed.add_field(name="⏱️ Data Retention", value="Data is deleted when you leave the voice channel or use /stop.", inline=False)
+    embed.set_footer(text="Last updated: June 10, 2026 | S1mplicity Music Bot")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+# ============================================================
 # ON READY
 # ============================================================
 @bot.event
@@ -559,6 +574,7 @@ async def on_ready():
     print(f"🎵 FFmpeg path: {FFMPEG_PATH}")
     print(f"📁 Guilds: {[guild.name for guild in bot.guilds]}")
     print(f"✅ Slash commands are ready. Type / in Discord to see them.")
+    print(f"📋 Privacy command added - type /privacy")
 
 # ============================================================
 # RUN BOT - USING ENVIRONMENT VARIABLE
