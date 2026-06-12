@@ -37,27 +37,28 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 CYBERPUNK_COLOR = discord.Color.from_rgb(90, 20, 160)
 
 # ============================================================
-# COOKIE CONFIGURATION - WITH DEBUGGING
+# COOKIE CONFIGURATION - FIXED FOR RAILWAY
 # ============================================================
 
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
 COOKIE_FILE = None
 
+# First try environment variable (Railway)
 cookies_content = os.getenv("COOKIES_CONTENT")
-if cookies_content:
+if cookies_content and len(cookies_content) > 100:
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
         f.write(cookies_content)
         COOKIE_FILE = f.name
-    print(f"[CONFIG] ✅ Using cookies from COOKIES_CONTENT environment variable")
-    print(f"[CONFIG] Temp cookie file: {COOKIE_FILE}")
+    print(f"[CONFIG] ✅ Using cookies from COOKIES_CONTENT env var")
     print(f"[CONFIG] Cookie size: {len(cookies_content)} bytes")
 else:
+    # Fallback to local file
     COOKIE_FILE = os.path.join(BOT_DIR, "cookies.txt")
     if os.path.exists(COOKIE_FILE):
         print(f"[CONFIG] ✅ Using cookies from local file: {COOKIE_FILE}")
         print(f"[CONFIG] Cookie size: {os.path.getsize(COOKIE_FILE)} bytes")
     else:
-        print(f"[CONFIG] ❌ No cookies found! Age-restricted videos WILL FAIL.")
+        print(f"[CONFIG] ❌ No cookies found!")
 
 # ============================================================
 # IGNORE PREFIX COMMANDS
@@ -242,12 +243,12 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - FINAL FIXED VERSION
+# YT-DLP OPTIONS - SIMPLIFIED AND RELIABLE
 # ============================================================
 
 def get_ytdl_options():
     opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio",
+        "format": "bestaudio/best",
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
@@ -261,22 +262,17 @@ def get_ytdl_options():
         },
         "extractor_args": {
             "youtube": {
-                "skip": ["hls", "dash"],
-                "player_client": ["android", "ios", "web"],
+                "skip": ["dash"],
+                "player_client": ["ios", "android"],
             }
         },
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }],
     }
     
     if COOKIE_FILE and os.path.exists(COOKIE_FILE):
         opts["cookiefile"] = COOKIE_FILE
-        print(f"[YT-DLP] ✅ Cookies file loaded successfully")
+        print(f"[YT-DLP] ✅ Cookies loaded from: {COOKIE_FILE}")
     else:
-        print(f"[YT-DLP] ❌ No cookies file found at: {COOKIE_FILE}")
+        print(f"[YT-DLP] ❌ No cookies file found")
     
     return opts
 
@@ -308,9 +304,11 @@ def create_source(url: str):
     except yt_dlp.utils.DownloadError as e:
         error_msg = str(e)
         if "Sign in to confirm" in error_msg:
-            raise RuntimeError("Age-restricted video. Cookies expired. Please refresh COOKIES_CONTENT in Railway.")
+            raise RuntimeError("Age-restricted video. Cookies expired. Update COOKIES_CONTENT in Railway.")
         elif "Video unavailable" in error_msg:
-            raise RuntimeError("Video unavailable")
+            raise RuntimeError("Video is unavailable")
+        elif "Requested format" in error_msg:
+            raise RuntimeError("YouTube format error. Please try a different song.")
         else:
             raise RuntimeError(f"YouTube error: {error_msg[:100]}")
     except Exception as e:
@@ -578,9 +576,9 @@ async def on_ready():
     print(f"✅ Slash commands ready")
     
     if COOKIE_FILE and os.path.exists(COOKIE_FILE):
-        print(f"🍪 Cookies loaded successfully")
+        print(f"🍪 Cookies loaded")
     else:
-        print(f"⚠️ WARNING: No cookies found! Age-restricted videos will not play.")
+        print(f"⚠️ WARNING: No cookies found!")
 
 # ============================================================
 # RUN BOT
