@@ -7,6 +7,17 @@ import asyncio
 import time
 import shutil
 import tempfile
+import subprocess
+import sys
+
+# ============================================================
+# FORCE UPDATE YT-DLP (FIXES FORMAT ERRORS)
+# ============================================================
+try:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"])
+    print("[YT-DLP] Successfully updated to latest version")
+except Exception as e:
+    print(f"[YT-DLP] Update skipped: {e}")
 
 # ============================================================
 # CONFIGURATION - FFMPEG AUTO-DETECTION
@@ -37,35 +48,21 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 CYBERPUNK_COLOR = discord.Color.from_rgb(90, 20, 160)
 
 # ============================================================
-# COOKIE CONFIGURATION - Supports both file and env variable
+# COOKIE CONFIGURATION
 # ============================================================
 
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
 COOKIE_FILE = None
 
-# First, try to get cookies from environment variable (Railway)
 cookies_content = os.getenv("COOKIES_CONTENT")
 if cookies_content:
-    # Create a temporary cookies file
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
         f.write(cookies_content)
         COOKIE_FILE = f.name
-    print(f"[CONFIG] Using cookies from environment variable (COOKIES_CONTENT)")
-    print(f"[CONFIG] Temporary cookie file created at: {COOKIE_FILE}")
+    print(f"[CONFIG] Using cookies from environment variable")
 else:
-    # Fallback to local cookies.txt file
     COOKIE_FILE = os.path.join(BOT_DIR, "cookies.txt")
-    print(f"[CONFIG] Bot directory: {BOT_DIR}")
-    print(f"[CONFIG] Cookie file path: {COOKIE_FILE}")
     print(f"[CONFIG] Cookie file exists: {os.path.exists(COOKIE_FILE)}")
-    
-    if os.path.exists(COOKIE_FILE):
-        cookie_size = os.path.getsize(COOKIE_FILE)
-        print(f"[CONFIG] Cookie file size: {cookie_size} bytes")
-        if cookie_size < 100:
-            print(f"[WARNING] Cookie file is very small ({cookie_size} bytes). Might be invalid.")
-    else:
-        print(f"[WARNING] No cookies.txt found and COOKIES_CONTENT env var not set! Age-restricted videos will FAIL.")
 
 # ============================================================
 # IGNORE PREFIX COMMANDS
@@ -111,7 +108,7 @@ def get_player(guild: discord.Guild) -> MusicPlayer:
     return music_players[guild.id]
 
 # ============================================================
-# PROGRESS BAR - FIXED (now fills completely at end)
+# PROGRESS BAR - FIXED
 # ============================================================
 def make_progress_bar(current: float, total: float, length: int = 20):
     if total <= 0:
@@ -250,12 +247,12 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - FIXED FORMAT SELECTOR
+# YT-DLP OPTIONS - FINAL FIXED VERSION
 # ============================================================
 
 def get_ytdl_options():
     opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio/best",
+        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio",
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
@@ -272,14 +269,17 @@ def get_ytdl_options():
                 "skip": ["hls", "dash"],
                 "player_client": ["android", "web"],
             }
-        }
+        },
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }],
     }
     
     if COOKIE_FILE and os.path.exists(COOKIE_FILE):
         opts["cookiefile"] = COOKIE_FILE
-        print(f"[YT-DLP] Using cookies from: {COOKIE_FILE}")
-    else:
-        print(f"[YT-DLP] No cookies file found at {COOKIE_FILE}")
+        print(f"[YT-DLP] Cookies loaded")
     
     return opts
 
@@ -304,22 +304,20 @@ def create_source(url: str):
                         break
             
             if "url" not in info:
-                raise ValueError("Could not extract audio URL from this video")
+                raise ValueError("Could not extract audio URL")
             
             return info, info["url"]
             
     except yt_dlp.utils.DownloadError as e:
         error_msg = str(e)
         if "Sign in to confirm" in error_msg:
-            raise RuntimeError("This video is age-restricted. Cookies may be expired. Please refresh cookies.txt")
+            raise RuntimeError("Age-restricted video. Cookies expired.")
         elif "Video unavailable" in error_msg:
-            raise RuntimeError("Video is unavailable (private/deleted/region blocked)")
-        elif "HTTP Error 400" in error_msg:
-            raise RuntimeError("YouTube is blocking the request. Cookies may be invalid.")
+            raise RuntimeError("Video unavailable")
         else:
-            raise RuntimeError(f"YouTube error: {error_msg[:200]}")
+            raise RuntimeError(f"YouTube error")
     except Exception as e:
-        raise RuntimeError(f"Failed to process: {str(e)[:200]}")
+        raise RuntimeError(f"Failed: {str(e)[:100]}")
 
 # ============================================================
 # PLAYBACK ENGINE
@@ -580,17 +578,15 @@ async def on_ready():
     print(f"✅ Bot is online. Logged in as {bot.user}")
     print(f"🎵 FFmpeg path: {FFMPEG_PATH}")
     print(f"📁 Guilds: {[guild.name for guild in bot.guilds]}")
-    print(f"✅ Slash commands are ready. Type / in Discord to see them.")
+    print(f"✅ Slash commands ready")
     
     if COOKIE_FILE and os.path.exists(COOKIE_FILE):
-        print(f"🍪 Cookies loaded from: {COOKIE_FILE}")
-    else:
-        print(f"⚠️ No cookies found! Age-restricted videos will FAIL.")
+        print(f"🍪 Cookies loaded")
 
 # ============================================================
 # RUN BOT
 # ============================================================
 TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:
-    raise ValueError("DISCORD_TOKEN environment variable not set. Please set it and try again.")
+    raise ValueError("DISCORD_TOKEN environment variable not set")
 bot.run(TOKEN)
