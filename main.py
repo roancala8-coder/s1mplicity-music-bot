@@ -7,6 +7,22 @@ import asyncio
 import time
 import shutil
 import tempfile
+import subprocess
+import threading
+
+# ============================================================
+# START PO TOKEN PROVIDER (runs in background)
+# ============================================================
+
+def start_token_provider():
+    try:
+        subprocess.Popen(["bgutil-ytdlp-pot-provider"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(2)
+        print("[PO-TOKEN] Provider started successfully")
+    except Exception as e:
+        print(f"[PO-TOKEN] Failed to start provider: {e}")
+
+threading.Thread(target=start_token_provider, daemon=True).start()
 
 # ============================================================
 # CONFIGURATION - FFMPEG AUTO-DETECTION
@@ -237,7 +253,7 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS
+# YT-DLP OPTIONS WITH PO TOKEN SUPPORT
 # ============================================================
 
 def get_ytdl_options():
@@ -258,6 +274,8 @@ def get_ytdl_options():
             "youtube": {
                 "skip": ["dash"],
                 "player_client": ["ios", "android"],
+                "po_token": "web+{}",
+                "visitor_data": "{}",
             }
         },
     }
@@ -296,7 +314,7 @@ def create_source(url: str):
     except yt_dlp.utils.DownloadError as e:
         error_msg = str(e)
         if "Sign in to confirm" in error_msg:
-            raise RuntimeError("Age-restricted video. Cookies expired.")
+            raise RuntimeError("Age-restricted video. Cookies expired or PO token failed.")
         elif "Video unavailable" in error_msg:
             raise RuntimeError("Video is unavailable")
         elif "Requested format" in error_msg:
