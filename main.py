@@ -36,20 +36,17 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 CYBERPUNK_COLOR = discord.Color.from_rgb(90, 20, 160)
 
 # ============================================================
-# COOKIE CONFIGURATION - FIXED
+# COOKIE CONFIGURATION
 # ============================================================
 
-# Get the directory where this script is located
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
 COOKIE_FILE = os.path.join(BOT_DIR, "cookies.txt")
 
-# Print cookie status on startup
 print(f"[CONFIG] Bot directory: {BOT_DIR}")
 print(f"[CONFIG] Cookie file path: {COOKIE_FILE}")
 print(f"[CONFIG] Cookie file exists: {os.path.exists(COOKIE_FILE)}")
 
 if os.path.exists(COOKIE_FILE):
-    # Verify cookie file has content
     cookie_size = os.path.getsize(COOKIE_FILE)
     print(f"[CONFIG] Cookie file size: {cookie_size} bytes")
     if cookie_size < 100:
@@ -101,13 +98,17 @@ def get_player(guild: discord.Guild) -> MusicPlayer:
     return music_players[guild.id]
 
 # ============================================================
-# PROGRESS BAR
+# PROGRESS BAR - FIXED (now fills completely at end)
 # ============================================================
 def make_progress_bar(current: float, total: float, length: int = 20):
     if total <= 0:
         return "▱" * length
+    # Ensure ratio doesn't exceed 1.0 due to floating point errors
     ratio = min(1.0, current / total)
-    filled = int(ratio * length)
+    filled = int(round(ratio * length))
+    # Round up to length if very close to end
+    if total - current < 0.5 and filled < length:
+        filled = length
     empty = length - filled
     return "▰" * filled + "▱" * empty
 
@@ -193,6 +194,7 @@ def make_now_playing_embed(player: MusicPlayer):
 
     if player.start_time and not player.is_paused:
         elapsed = time.time() - player.start_time
+        # Ensure elapsed doesn't exceed duration (fixes negative time edge case)
         elapsed = max(0, min(elapsed, duration))
     elif player.start_time:
         elapsed = player.start_time
@@ -238,18 +240,17 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - FULLY FIXED WITH COOKIES AND NODE.JS
+# YT-DLP OPTIONS
 # ============================================================
 
 def get_ytdl_options():
-    """Returns yt-dlp options with proper cookie handling and Node.js runtime"""
     opts = {
         "format": "bestaudio/best",
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
         "extract_flat": False,
-        "js_runtimes": {"node": {}},  # <-- CORRECT FORMAT: dict, not list
+        "js_runtimes": {"node": {}},
         "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "headers": {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -264,7 +265,6 @@ def get_ytdl_options():
         }
     }
     
-    # Add cookies if file exists
     if os.path.exists(COOKIE_FILE):
         opts["cookiefile"] = COOKIE_FILE
         print(f"[YT-DLP] Using cookies from: {COOKIE_FILE}")
@@ -574,7 +574,7 @@ async def on_ready():
     print(f"🍪 Cookie status: {'LOADED' if os.path.exists(COOKIE_FILE) else 'MISSING'}")
 
 # ============================================================
-# RUN BOT - USING ENVIRONMENT VARIABLE
+# RUN BOT
 # ============================================================
 TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:
