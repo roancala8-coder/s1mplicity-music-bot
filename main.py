@@ -116,10 +116,8 @@ def get_player(guild: discord.Guild) -> MusicPlayer:
 def make_progress_bar(current: float, total: float, length: int = 20):
     if total <= 0:
         return "▱" * length
-    # Ensure ratio doesn't exceed 1.0 due to floating point errors
     ratio = min(1.0, current / total)
     filled = int(round(ratio * length))
-    # Round up to length if very close to end
     if total - current < 0.5 and filled < length:
         filled = length
     empty = length - filled
@@ -207,7 +205,6 @@ def make_now_playing_embed(player: MusicPlayer):
 
     if player.start_time and not player.is_paused:
         elapsed = time.time() - player.start_time
-        # Ensure elapsed doesn't exceed duration (fixes negative time edge case)
         elapsed = max(0, min(elapsed, duration))
     elif player.start_time:
         elapsed = player.start_time
@@ -253,12 +250,12 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS
+# YT-DLP OPTIONS - FIXED FORMAT SELECTOR
 # ============================================================
 
 def get_ytdl_options():
     opts = {
-        "format": "bestaudio/best",
+        "format": "bestaudio[ext=m4a]/bestaudio/best",
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
@@ -585,7 +582,6 @@ async def on_ready():
     print(f"📁 Guilds: {[guild.name for guild in bot.guilds]}")
     print(f"✅ Slash commands are ready. Type / in Discord to see them.")
     
-    # Cookie status
     if COOKIE_FILE and os.path.exists(COOKIE_FILE):
         print(f"🍪 Cookies loaded from: {COOKIE_FILE}")
     else:
