@@ -37,7 +37,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 CYBERPUNK_COLOR = discord.Color.from_rgb(90, 20, 160)
 
 # ============================================================
-# COOKIE CONFIGURATION
+# COOKIE CONFIGURATION - WITH DEBUGGING
 # ============================================================
 
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -48,10 +48,16 @@ if cookies_content:
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
         f.write(cookies_content)
         COOKIE_FILE = f.name
-    print(f"[CONFIG] Using cookies from environment variable")
+    print(f"[CONFIG] ✅ Using cookies from COOKIES_CONTENT environment variable")
+    print(f"[CONFIG] Temp cookie file: {COOKIE_FILE}")
+    print(f"[CONFIG] Cookie size: {len(cookies_content)} bytes")
 else:
     COOKIE_FILE = os.path.join(BOT_DIR, "cookies.txt")
-    print(f"[CONFIG] Cookie file exists: {os.path.exists(COOKIE_FILE)}")
+    if os.path.exists(COOKIE_FILE):
+        print(f"[CONFIG] ✅ Using cookies from local file: {COOKIE_FILE}")
+        print(f"[CONFIG] Cookie size: {os.path.getsize(COOKIE_FILE)} bytes")
+    else:
+        print(f"[CONFIG] ❌ No cookies found! Age-restricted videos WILL FAIL.")
 
 # ============================================================
 # IGNORE PREFIX COMMANDS
@@ -236,12 +242,12 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - FINAL WORKING VERSION
+# YT-DLP OPTIONS - FINAL FIXED VERSION
 # ============================================================
 
 def get_ytdl_options():
     opts = {
-        "format": "worstaudio/worst",
+        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio",
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
@@ -262,13 +268,15 @@ def get_ytdl_options():
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
-            "preferredquality": "128",
+            "preferredquality": "192",
         }],
     }
     
     if COOKIE_FILE and os.path.exists(COOKIE_FILE):
         opts["cookiefile"] = COOKIE_FILE
-        print(f"[YT-DLP] Cookies loaded")
+        print(f"[YT-DLP] ✅ Cookies file loaded successfully")
+    else:
+        print(f"[YT-DLP] ❌ No cookies file found at: {COOKIE_FILE}")
     
     return opts
 
@@ -300,11 +308,11 @@ def create_source(url: str):
     except yt_dlp.utils.DownloadError as e:
         error_msg = str(e)
         if "Sign in to confirm" in error_msg:
-            raise RuntimeError("Age-restricted video. Cookies expired.")
+            raise RuntimeError("Age-restricted video. Cookies expired. Please refresh COOKIES_CONTENT in Railway.")
         elif "Video unavailable" in error_msg:
             raise RuntimeError("Video unavailable")
         else:
-            raise RuntimeError(f"YouTube error")
+            raise RuntimeError(f"YouTube error: {error_msg[:100]}")
     except Exception as e:
         raise RuntimeError(f"Failed: {str(e)[:100]}")
 
@@ -570,7 +578,9 @@ async def on_ready():
     print(f"✅ Slash commands ready")
     
     if COOKIE_FILE and os.path.exists(COOKIE_FILE):
-        print(f"🍪 Cookies loaded")
+        print(f"🍪 Cookies loaded successfully")
+    else:
+        print(f"⚠️ WARNING: No cookies found! Age-restricted videos will not play.")
 
 # ============================================================
 # RUN BOT
