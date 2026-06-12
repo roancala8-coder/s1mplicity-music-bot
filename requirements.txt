@@ -2,4 +2,5 @@ discord.py>=2.3.2
 yt-dlp>=2025.05.22
 pynacl>=1.5.0
 davey
-bgutil-ytdlp-pot-provider>=1.3.1
+yt-dlp-get-pot>=0.3.0
+yt-dlp-getpot-wpc>=1.0.0
