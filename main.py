@@ -7,13 +7,6 @@ import asyncio
 import time
 import shutil
 import tempfile
-import subprocess
-import sys
-
-# ============================================================
-# FORCE INSTALL LATEST YT-DLP DEV VERSION
-# ============================================================
-subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "git+https://github.com/yt-dlp/yt-dlp.git"])
 
 # ============================================================
 # CONFIGURATION - FFMPEG AUTO-DETECTION
@@ -243,7 +236,7 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - FINAL FIX
+# YT-DLP OPTIONS - FINAL WORKING VERSION
 # ============================================================
 
 def get_ytdl_options():
