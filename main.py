@@ -6,6 +6,7 @@ import yt_dlp
 import asyncio
 import time
 import shutil
+import tempfile
 
 # ============================================================
 # CONFIGURATION - FFMPEG AUTO-DETECTION
@@ -36,23 +37,35 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 CYBERPUNK_COLOR = discord.Color.from_rgb(90, 20, 160)
 
 # ============================================================
-# COOKIE CONFIGURATION
+# COOKIE CONFIGURATION - Supports both file and env variable
 # ============================================================
 
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
-COOKIE_FILE = os.path.join(BOT_DIR, "cookies.txt")
+COOKIE_FILE = None
 
-print(f"[CONFIG] Bot directory: {BOT_DIR}")
-print(f"[CONFIG] Cookie file path: {COOKIE_FILE}")
-print(f"[CONFIG] Cookie file exists: {os.path.exists(COOKIE_FILE)}")
-
-if os.path.exists(COOKIE_FILE):
-    cookie_size = os.path.getsize(COOKIE_FILE)
-    print(f"[CONFIG] Cookie file size: {cookie_size} bytes")
-    if cookie_size < 100:
-        print(f"[WARNING] Cookie file is very small ({cookie_size} bytes). Might be invalid.")
+# First, try to get cookies from environment variable (Railway)
+cookies_content = os.getenv("COOKIES_CONTENT")
+if cookies_content:
+    # Create a temporary cookies file
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        f.write(cookies_content)
+        COOKIE_FILE = f.name
+    print(f"[CONFIG] Using cookies from environment variable (COOKIES_CONTENT)")
+    print(f"[CONFIG] Temporary cookie file created at: {COOKIE_FILE}")
 else:
-    print(f"[WARNING] No cookies.txt found! Age-restricted videos will FAIL.")
+    # Fallback to local cookies.txt file
+    COOKIE_FILE = os.path.join(BOT_DIR, "cookies.txt")
+    print(f"[CONFIG] Bot directory: {BOT_DIR}")
+    print(f"[CONFIG] Cookie file path: {COOKIE_FILE}")
+    print(f"[CONFIG] Cookie file exists: {os.path.exists(COOKIE_FILE)}")
+    
+    if os.path.exists(COOKIE_FILE):
+        cookie_size = os.path.getsize(COOKIE_FILE)
+        print(f"[CONFIG] Cookie file size: {cookie_size} bytes")
+        if cookie_size < 100:
+            print(f"[WARNING] Cookie file is very small ({cookie_size} bytes). Might be invalid.")
+    else:
+        print(f"[WARNING] No cookies.txt found and COOKIES_CONTENT env var not set! Age-restricted videos will FAIL.")
 
 # ============================================================
 # IGNORE PREFIX COMMANDS
@@ -265,7 +278,7 @@ def get_ytdl_options():
         }
     }
     
-    if os.path.exists(COOKIE_FILE):
+    if COOKIE_FILE and os.path.exists(COOKIE_FILE):
         opts["cookiefile"] = COOKIE_FILE
         print(f"[YT-DLP] Using cookies from: {COOKIE_FILE}")
     else:
@@ -571,7 +584,12 @@ async def on_ready():
     print(f"🎵 FFmpeg path: {FFMPEG_PATH}")
     print(f"📁 Guilds: {[guild.name for guild in bot.guilds]}")
     print(f"✅ Slash commands are ready. Type / in Discord to see them.")
-    print(f"🍪 Cookie status: {'LOADED' if os.path.exists(COOKIE_FILE) else 'MISSING'}")
+    
+    # Cookie status
+    if COOKIE_FILE and os.path.exists(COOKIE_FILE):
+        print(f"🍪 Cookies loaded from: {COOKIE_FILE}")
+    else:
+        print(f"⚠️ No cookies found! Age-restricted videos will FAIL.")
 
 # ============================================================
 # RUN BOT
