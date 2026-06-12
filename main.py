@@ -11,13 +11,9 @@ import subprocess
 import sys
 
 # ============================================================
-# FORCE UPDATE YT-DLP (FIXES FORMAT ERRORS)
+# FORCE INSTALL LATEST YT-DLP DEV VERSION
 # ============================================================
-try:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"])
-    print("[YT-DLP] Successfully updated to latest version")
-except Exception as e:
-    print(f"[YT-DLP] Update skipped: {e}")
+subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "git+https://github.com/yt-dlp/yt-dlp.git"])
 
 # ============================================================
 # CONFIGURATION - FFMPEG AUTO-DETECTION
@@ -108,7 +104,7 @@ def get_player(guild: discord.Guild) -> MusicPlayer:
     return music_players[guild.id]
 
 # ============================================================
-# PROGRESS BAR - FIXED
+# PROGRESS BAR
 # ============================================================
 def make_progress_bar(current: float, total: float, length: int = 20):
     if total <= 0:
@@ -247,12 +243,12 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - FINAL FIXED VERSION
+# YT-DLP OPTIONS - FINAL FIX
 # ============================================================
 
 def get_ytdl_options():
     opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio",
+        "format": "worstaudio/worst",
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
@@ -267,13 +263,13 @@ def get_ytdl_options():
         "extractor_args": {
             "youtube": {
                 "skip": ["hls", "dash"],
-                "player_client": ["android", "web"],
+                "player_client": ["android", "ios", "web"],
             }
         },
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
-            "preferredquality": "192",
+            "preferredquality": "128",
         }],
     }
     
