@@ -9,18 +9,6 @@ import shutil
 import tempfile
 import subprocess
 import threading
-import sys
-
-# ============================================================
-# PLUGIN DIRECTORY SETUP (for Audiomack support)
-# ============================================================
-
-plugin_dir = os.path.join(os.getcwd(), 'yt_dlp_plugins')
-if os.path.exists(plugin_dir):
-    sys.path.insert(0, plugin_dir)
-    print(f"[CONFIG] ✅ yt-dlp plugins loaded from: {plugin_dir}")
-else:
-    print(f"[CONFIG] ⚠️ Plugin directory not found: {plugin_dir}")
 
 # ============================================================
 # START PO TOKEN PROVIDER (runs in background)
