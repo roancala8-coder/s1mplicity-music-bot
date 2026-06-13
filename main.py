@@ -1,4 +1,5 @@
 import os
+import sys
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands
@@ -11,6 +12,17 @@ import subprocess
 import threading
 
 # ============================================================
+# PLUGIN DIRECTORY SETUP (for Audiomack support)
+# ============================================================
+
+plugin_dir = os.path.join(os.getcwd(), 'yt_dlp_plugins')
+if os.path.exists(plugin_dir):
+    sys.path.insert(0, plugin_dir)
+    print(f"[PLUGIN] ✅ yt-dlp plugins loaded from: {plugin_dir}")
+else:
+    print(f"[PLUGIN] ⚠️ Plugin directory not found: {plugin_dir}")
+
+# ============================================================
 # START PO TOKEN PROVIDER (runs in background)
 # ============================================================
 
@@ -18,9 +30,9 @@ def start_token_provider():
     try:
         subprocess.Popen(["bgutil-ytdlp-pot-provider"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         time.sleep(2)
-        print("[PO-TOKEN] Provider started successfully")
+        print("[PO-TOKEN] ✅ Provider started successfully")
     except Exception as e:
-        print(f"[PO-TOKEN] Failed to start provider: {e}")
+        print(f"[PO-TOKEN] ❌ Failed to start provider: {e}")
 
 threading.Thread(target=start_token_provider, daemon=True).start()
 
@@ -53,22 +65,25 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 CYBERPUNK_COLOR = discord.Color.from_rgb(90, 20, 160)
 
 # ============================================================
-# COOKIE CONFIGURATION
+# COOKIE CONFIGURATION - RAILWAY FRIENDLY
 # ============================================================
 
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
 COOKIE_FILE = None
 
+# Try environment variable first (Railway)
 cookies_content = os.getenv("COOKIES_CONTENT")
-if cookies_content and len(cookies_content) > 100:
+if cookies_content and len(cookies_content) > 500:
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
         f.write(cookies_content)
         COOKIE_FILE = f.name
-    print(f"[CONFIG] ✅ Using cookies from COOKIES_CONTENT env var")
-else:
+    print(f"[CONFIG] ✅ Using cookies from COOKIES_CONTENT env var ({len(cookies_content)} bytes)")
+elif os.path.exists(os.path.join(BOT_DIR, "cookies.txt")):
     COOKIE_FILE = os.path.join(BOT_DIR, "cookies.txt")
-    if os.path.exists(COOKIE_FILE):
-        print(f"[CONFIG] ✅ Using cookies from local file")
+    print(f"[CONFIG] ✅ Using cookies from local file: {COOKIE_FILE}")
+    print(f"[CONFIG] Cookie size: {os.path.getsize(COOKIE_FILE)} bytes")
+else:
+    print(f"[CONFIG] ⚠️ No cookies found! Age-restricted videos will fail.")
 
 # ============================================================
 # IGNORE PREFIX COMMANDS
@@ -283,6 +298,8 @@ def get_ytdl_options():
     if COOKIE_FILE and os.path.exists(COOKIE_FILE):
         opts["cookiefile"] = COOKIE_FILE
         print(f"[YT-DLP] ✅ Cookies loaded")
+    else:
+        print(f"[YT-DLP] ⚠️ No cookies file found")
     
     return opts
 
