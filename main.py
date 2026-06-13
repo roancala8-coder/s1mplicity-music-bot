@@ -16,9 +16,9 @@ import threading
 # ============================================================
 
 plugin_dir = os.path.join(os.getcwd(), 'yt_dlp_plugins')
-if os.path.exists(plugin_dir):
+if os.path.exists(plugin_dir) and plugin_dir not in sys.path:
     sys.path.insert(0, plugin_dir)
-    print(f"[PLUGIN] ✅ yt-dlp plugins loaded from: {plugin_dir}")
+    print(f"[PLUGIN] ✅ Custom extractor plugin directory added: {plugin_dir}")
 else:
     print(f"[PLUGIN] ⚠️ Plugin directory not found: {plugin_dir}")
 
