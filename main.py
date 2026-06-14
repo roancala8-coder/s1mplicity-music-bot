@@ -12,24 +12,17 @@ import subprocess
 import threading
 
 # ============================================================
-# PLUGIN DIRECTORY SETUP (for Audiomack support)
-# ============================================================
-
-plugin_dir = os.path.join(os.getcwd(), 'yt_dlp_plugins')
-if os.path.exists(plugin_dir) and plugin_dir not in sys.path:
-    sys.path.insert(0, plugin_dir)
-    print(f"[PLUGIN] ✅ Custom extractor plugin directory added: {plugin_dir}")
-else:
-    print(f"[PLUGIN] ⚠️ Plugin directory not found: {plugin_dir}")
-
-# ============================================================
 # START PO TOKEN PROVIDER (runs in background)
 # ============================================================
 
 def start_token_provider():
     try:
+        # Kill any existing provider process
+        subprocess.Popen("pkill -f bgutil-ytdlp-pot-provider", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(1)
+        # Start new provider
         subprocess.Popen(["bgutil-ytdlp-pot-provider"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(2)
+        time.sleep(3)
         print("[PO-TOKEN] ✅ Provider started successfully")
     except Exception as e:
         print(f"[PO-TOKEN] ❌ Failed to start provider: {e}")
@@ -71,7 +64,6 @@ CYBERPUNK_COLOR = discord.Color.from_rgb(90, 20, 160)
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
 COOKIE_FILE = None
 
-# Try environment variable first (Railway)
 cookies_content = os.getenv("COOKIES_CONTENT")
 if cookies_content and len(cookies_content) > 500:
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
@@ -268,7 +260,7 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS WITH PO TOKEN SUPPORT
+# YT-DLP OPTIONS - FIXED PO TOKEN + COOKIES
 # ============================================================
 
 def get_ytdl_options():
@@ -288,16 +280,14 @@ def get_ytdl_options():
         "extractor_args": {
             "youtube": {
                 "skip": ["dash"],
-                "player_client": ["ios", "android"],
-                "po_token": "web+{}",
-                "visitor_data": "{}",
+                "player_client": ["ios", "android", "web"],
             }
         },
     }
     
     if COOKIE_FILE and os.path.exists(COOKIE_FILE):
         opts["cookiefile"] = COOKIE_FILE
-        print(f"[YT-DLP] ✅ Cookies loaded")
+        print(f"[YT-DLP] ✅ Cookies loaded from: {COOKIE_FILE}")
     else:
         print(f"[YT-DLP] ⚠️ No cookies file found")
     
@@ -331,7 +321,7 @@ def create_source(url: str):
     except yt_dlp.utils.DownloadError as e:
         error_msg = str(e)
         if "Sign in to confirm" in error_msg:
-            raise RuntimeError("Age-restricted video. Cookies expired or PO token failed.")
+            raise RuntimeError("Age-restricted video. Cookies expired. Refresh COOKIES_CONTENT.")
         elif "Video unavailable" in error_msg:
             raise RuntimeError("Video is unavailable")
         elif "Requested format" in error_msg:
