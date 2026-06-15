@@ -10,8 +10,6 @@ import shutil
 import tempfile
 import subprocess
 import threading
-import json
-import re
 
 # ============================================================
 # START PO TOKEN PROVIDER (runs in background)
@@ -268,28 +266,26 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - FULLY UPDATED WORKING VERSION
+# YT-DLP OPTIONS - SIMPLIFIED WORKING CONFIGURATION
 # ============================================================
 
 def get_ytdl_options():
     opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio/best",
+        "format": "bestaudio/best",
         "quiet": True,
         "no_warnings": False,
         "noplaylist": True,
         "extract_flat": False,
-        # Enable remote EJS components from npm for JavaScript challenge solving
-        "remote_components": ["ejs:npm"],
         "extractor_args": {
             "youtube": {
-                "skip": ["hls"],
-                # Only use supported clients
-                "player_client": ["web_music", "web"],
+                "skip": ["hls", "dash"],
+                "player_client": ["android"],
             }
         },
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
-            "preferredcodec": "m4a",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
         }],
         "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "headers": {
@@ -367,7 +363,7 @@ def create_source(url: str):
         raise RuntimeError(f"Failed to load: {str(e)[:100]}")
 
 # ============================================================
-# PLAYBACK ENGINE
+# PLAYBACK ENGINE (unchanged)
 # ============================================================
 async def play_next(guild: discord.Guild):
     vc = guild.voice_client
@@ -471,7 +467,7 @@ async def start_playback(interaction: discord.Interaction, url: str):
         await interaction.followup.send(f"✅ Added **{info.get('title', 'Unknown')}** to queue (position {queue_pos})")
 
 # ============================================================
-# SLASH COMMANDS
+# SLASH COMMANDS (unchanged)
 # ============================================================
 
 @bot.tree.command(name="join", description="Join your current voice channel")
