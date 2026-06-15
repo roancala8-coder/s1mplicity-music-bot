@@ -278,12 +278,8 @@ def get_ytdl_options():
         "no_warnings": False,
         "noplaylist": True,
         "extract_flat": False,
-        # FIXED: js_runtimes as dict, not list
-        "js_runtimes": {
-            "node": {
-                "path": ["node", "/usr/bin/node", "/usr/local/bin/node"],
-            }
-        },
+        # FIXED: js_runtimes as simple string (auto-detects Node.js from PATH)
+        "js_runtimes": "node",
         "extractor_args": {
             "youtube": {
                 "skip": ["hls"],
