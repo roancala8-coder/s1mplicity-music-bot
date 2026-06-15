@@ -10,6 +10,8 @@ import shutil
 import tempfile
 import subprocess
 import threading
+import json
+import re
 
 # ============================================================
 # START PO TOKEN PROVIDER (runs in background)
@@ -18,8 +20,10 @@ import threading
 def start_token_provider():
     try:
         # Kill any existing provider process
-        subprocess.Popen("pkill -f bgutil-ytdlp-pot-provider", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(1)
+        if sys.platform != "win32":
+            subprocess.Popen("pkill -f bgutil-ytdlp-pot-provider", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(1)
+        
         # Start new provider
         subprocess.Popen(["bgutil-ytdlp-pot-provider"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         time.sleep(3)
@@ -40,7 +44,9 @@ def find_ffmpeg():
     common_paths = [
         r"C:\ffmpeg\bin\ffmpeg.exe",
         r"C:\Program Files\ffmpeg\bin\ffmpeg.exe",
-        os.path.expanduser(r"~\ffmpeg\bin\ffmpeg.exe")
+        os.path.expanduser(r"~\ffmpeg\bin\ffmpeg.exe"),
+        "/usr/bin/ffmpeg",
+        "/usr/local/bin/ffmpeg"
     ]
     
     for path in common_paths:
@@ -260,31 +266,27 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - FIXED WITH PO TOKEN + MWEB CLIENT
+# YT-DLP OPTIONS - FIXED WITH PROPER PO TOKEN + MULTIPLE CLIENTS
 # ============================================================
 
 def get_ytdl_options():
     opts = {
-        "format": "bestaudio/best",
+        "format": "bestaudio[ext=m4a]/bestaudio/best",
         "quiet": True,
-        "no_warnings": True,
+        "no_warnings": False,
         "noplaylist": True,
         "extract_flat": False,
-        "js_runtimes": {"node": {}},
-        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "headers": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        },
         "extractor_args": {
             "youtube": {
-                "skip": ["dash"],
-                "player_client": ["mweb", "ios", "android"],
-                "po_token": "web+{}",
-                "visitor_data": "{}",
+                "skip": ["hls", "dash"],
+                "player_client": ["android", "ios", "web"],
             }
         },
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "m4a",
+        }],
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     }
     
     if COOKIE_FILE and os.path.exists(COOKIE_FILE):
@@ -297,41 +299,64 @@ def get_ytdl_options():
 
 def create_source(url: str):
     try:
+        # Fix search queries
+        if not url.startswith(("http://", "https://")):
+            url = f"ytsearch1:{url}"
+            print(f"[YT-DLP] Search query: {url}")
+        
         ytdl_opts = get_ytdl_options()
         
         with yt_dlp.YoutubeDL(ytdl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
+            
             if info is None:
                 raise ValueError("Could not extract video info")
             
+            # Handle search results
             if "entries" in info:
                 if not info["entries"]:
                     raise ValueError("No results found for that query")
                 info = info["entries"][0]
             
-            if "url" not in info and "formats" in info:
-                for f in info.get("formats", []):
+            # Get the best audio URL
+            audio_url = None
+            
+            # Try different approaches to get audio URL
+            if "url" in info:
+                audio_url = info["url"]
+            elif "formats" in info:
+                # Find best audio-only format
+                for f in info["formats"]:
                     if f.get("acodec") != "none" and f.get("vcodec") == "none":
-                        info["url"] = f["url"]
+                        audio_url = f["url"]
                         break
+                
+                # Fallback to any format with audio
+                if not audio_url:
+                    for f in info["formats"]:
+                        if f.get("acodec") != "none":
+                            audio_url = f["url"]
+                            break
             
-            if "url" not in info:
-                raise ValueError("Could not extract audio URL")
+            if not audio_url:
+                raise ValueError("Could not extract audio URL from video")
             
-            return info, info["url"]
+            print(f"[YT-DLP] ✅ Extracted: {info.get('title', 'Unknown')}")
+            return info, audio_url
             
     except yt_dlp.utils.DownloadError as e:
         error_msg = str(e)
-        if "Sign in to confirm" in error_msg:
-            raise RuntimeError("Age-restricted video. Cookies expired. Refresh COOKIES_CONTENT in Railway.")
+        if "Sign in to confirm" in error_msg or "cookies" in error_msg.lower():
+            raise RuntimeError("⚠️ Age-restricted video or cookies expired. Update COOKIES_CONTENT in Railway.")
         elif "Video unavailable" in error_msg:
-            raise RuntimeError("Video is unavailable")
+            raise RuntimeError("❌ Video is unavailable or private")
         elif "Requested format" in error_msg:
-            raise RuntimeError("YouTube format error. Try another song.")
+            # Try fallback with different format
+            raise RuntimeError("⚠️ Format error, try another video source")
         else:
-            raise RuntimeError(f"YouTube error: {error_msg[:100]}")
+            raise RuntimeError(f"YouTube error: {error_msg[:150]}")
     except Exception as e:
-        raise RuntimeError(f"Failed: {str(e)[:100]}")
+        raise RuntimeError(f"Failed to load: {str(e)[:100]}")
 
 # ============================================================
 # PLAYBACK ENGINE
@@ -393,10 +418,13 @@ async def start_playback(interaction: discord.Interaction, url: str):
     vc = guild.voice_client
     player = get_player(guild)
 
+    # Show "processing" message
+    await interaction.followup.send("🎵 Processing your request...", ephemeral=False)
+
     try:
         info, audio_url = create_source(url)
     except RuntimeError as e:
-        await interaction.followup.send(f"❌ {e}", ephemeral=True)
+        await interaction.followup.send(f"❌ {e}", ephemeral=False)
         return
 
     if not vc.is_playing() and not player.current:
@@ -413,7 +441,7 @@ async def start_playback(interaction: discord.Interaction, url: str):
         try:
             source = discord.FFmpegPCMAudio(audio_url, executable=FFMPEG_PATH, **ffmpeg_opts)
         except Exception as e:
-            await interaction.followup.send(f"FFmpeg error: {e}", ephemeral=True)
+            await interaction.followup.send(f"❌ FFmpeg error: {e}", ephemeral=False)
             return
 
         def after_play(error):
@@ -425,6 +453,9 @@ async def start_playback(interaction: discord.Interaction, url: str):
 
         embed = make_now_playing_embed(player)
         view = MusicControlView(player)
+        
+        # Delete the processing message and send the now playing embed
+        await interaction.delete_original_response()
         player.message = await interaction.followup.send(embed=embed, view=view)
     else:
         player.queue.append({"info": info, "url": audio_url})
@@ -452,9 +483,6 @@ async def slash_play(interaction: discord.Interaction, query: str):
             await interaction.followup.send("❌ Join a voice channel first.", ephemeral=True)
             return
         await interaction.user.voice.channel.connect(self_deaf=True)
-    
-    if not query.startswith(("http://", "https://")):
-        query = f"ytsearch:{query}"
     
     await start_playback(interaction, query)
 
@@ -572,12 +600,9 @@ async def slash_nowplaying(interaction: discord.Interaction):
 # ============================================================
 @bot.event
 async def on_ready():
-    for guild in bot.guilds:
-        try:
-            await bot.tree.sync(guild=guild)
-            print(f"✅ Synced commands to: {guild.name}")
-        except Exception as e:
-            print(f"Failed to sync to {guild.name}: {e}")
+    # Sync commands
+    await bot.tree.sync()
+    print(f"✅ Synced commands globally")
     
     update_embeds.start()
     print(f"✅ Bot is online. Logged in as {bot.user}")
