@@ -16,7 +16,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Start POT provider in background, then your bot
-CMD cd /pot-provider/server && node build/main.js & \
-    sleep 5 && \
-    python main.py
+# Start POT provider in background, then your bot (Fixed CMD line)
+CMD ["sh", "-c", "cd /pot-provider/server && node build/main.js & sleep 5 && python main.py"]
