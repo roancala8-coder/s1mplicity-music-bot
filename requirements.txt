@@ -2,5 +2,4 @@ discord.py>=2.3.2
 yt-dlp>=2025.12.08
 pynacl>=1.5.0
 davey
-bgutil-ytdlp-pot-provider
 yt-dlp-ejs

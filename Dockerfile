@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# Install git, ffmpeg, nodejs (required for PO token provider)
+# Install git, ffmpeg, nodejs (required for PO token provider and EJS)
 RUN apt-get update && apt-get install -y git ffmpeg nodejs npm && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -16,5 +16,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Start POT provider in background, then your bot (Fixed CMD line)
-CMD ["sh", "-c", "cd /pot-provider/server && node build/main.js & sleep 5 && python main.py"]
+# Start POT provider in background, then your bot
+CMD ["sh", "-c", "cd /pot-provider/server && PORT=4416 node build/main.js & sleep 8 && python main.py"]

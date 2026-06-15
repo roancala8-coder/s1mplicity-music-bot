@@ -268,7 +268,7 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - WORKING CONFIGURATION
+# YT-DLP OPTIONS - FULLY UPDATED WORKING VERSION
 # ============================================================
 
 def get_ytdl_options():
@@ -278,12 +278,13 @@ def get_ytdl_options():
         "no_warnings": False,
         "noplaylist": True,
         "extract_flat": False,
-        # Working js_runtimes format - empty dict for auto-detection
-        "js_runtimes": {},
+        # Enable remote EJS components from npm for JavaScript challenge solving
+        "remote_components": ["ejs:npm"],
         "extractor_args": {
             "youtube": {
                 "skip": ["hls"],
-                "player_client": ["web_music", "web", "android_music"],
+                # Only use supported clients
+                "player_client": ["web_music", "web"],
             }
         },
         "postprocessors": [{
