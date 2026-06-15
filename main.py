@@ -31,7 +31,9 @@ def start_token_provider():
     except Exception as e:
         print(f"[PO-TOKEN] ❌ Failed to start provider: {e}")
 
-threading.Thread(target=start_token_provider, daemon=True).start()
+# Only start provider if not on Windows (Railway is Linux)
+if sys.platform != "win32":
+    threading.Thread(target=start_token_provider, daemon=True).start()
 
 # ============================================================
 # CONFIGURATION - FFMPEG AUTO-DETECTION
@@ -266,7 +268,7 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - UPDATED WITH NODE.JS RUNTIME & WORKING CLIENTS
+# YT-DLP OPTIONS - COMPLETELY FIXED VERSION
 # ============================================================
 
 def get_ytdl_options():
@@ -276,16 +278,15 @@ def get_ytdl_options():
         "no_warnings": False,
         "noplaylist": True,
         "extract_flat": False,
-        # Tell yt-dlp to use Node.js for JavaScript challenges
-        "js_runtimes": [{
-            "name": "node",
-            "path": ["node", "/usr/bin/node", "/usr/local/bin/node"],
-        }],
+        # FIXED: js_runtimes as dict, not list
+        "js_runtimes": {
+            "node": {
+                "path": ["node", "/usr/bin/node", "/usr/local/bin/node"],
+            }
+        },
         "extractor_args": {
             "youtube": {
-                # Only skip HLS, keep DASH for better quality
                 "skip": ["hls"],
-                # Use clients that actually work with cookies
                 "player_client": ["web_music", "web", "android_music"],
             }
         },
@@ -362,7 +363,6 @@ def create_source(url: str):
         elif "Video unavailable" in error_msg:
             raise RuntimeError("❌ Video is unavailable or private")
         elif "Requested format" in error_msg:
-            # Try fallback with different format
             raise RuntimeError("⚠️ Format error, try another video source")
         else:
             raise RuntimeError(f"YouTube error: {error_msg[:150]}")
