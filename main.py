@@ -260,7 +260,7 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - FIXED PO TOKEN + COOKIES
+# YT-DLP OPTIONS - FIXED WITH PO TOKEN + MWEB CLIENT
 # ============================================================
 
 def get_ytdl_options():
@@ -280,7 +280,9 @@ def get_ytdl_options():
         "extractor_args": {
             "youtube": {
                 "skip": ["dash"],
-                "player_client": ["ios", "android", "web"],
+                "player_client": ["mweb", "ios", "android"],
+                "po_token": "web+{}",
+                "visitor_data": "{}",
             }
         },
     }
@@ -321,7 +323,7 @@ def create_source(url: str):
     except yt_dlp.utils.DownloadError as e:
         error_msg = str(e)
         if "Sign in to confirm" in error_msg:
-            raise RuntimeError("Age-restricted video. Cookies expired. Refresh COOKIES_CONTENT.")
+            raise RuntimeError("Age-restricted video. Cookies expired. Refresh COOKIES_CONTENT in Railway.")
         elif "Video unavailable" in error_msg:
             raise RuntimeError("Video is unavailable")
         elif "Requested format" in error_msg:
