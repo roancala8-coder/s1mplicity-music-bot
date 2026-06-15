@@ -268,7 +268,7 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - COMPLETELY FIXED VERSION
+# YT-DLP OPTIONS - WORKING CONFIGURATION
 # ============================================================
 
 def get_ytdl_options():
@@ -278,8 +278,8 @@ def get_ytdl_options():
         "no_warnings": False,
         "noplaylist": True,
         "extract_flat": False,
-        # FIXED: js_runtimes as simple string (auto-detects Node.js from PATH)
-        "js_runtimes": "node",
+        # Working js_runtimes format - empty dict for auto-detection
+        "js_runtimes": {},
         "extractor_args": {
             "youtube": {
                 "skip": ["hls"],
