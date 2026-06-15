@@ -266,7 +266,7 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - FIXED WITH PROPER PO TOKEN + MULTIPLE CLIENTS
+# YT-DLP OPTIONS - UPDATED WITH NODE.JS RUNTIME & WORKING CLIENTS
 # ============================================================
 
 def get_ytdl_options():
@@ -276,10 +276,17 @@ def get_ytdl_options():
         "no_warnings": False,
         "noplaylist": True,
         "extract_flat": False,
+        # Tell yt-dlp to use Node.js for JavaScript challenges
+        "js_runtimes": [{
+            "name": "node",
+            "path": ["node", "/usr/bin/node", "/usr/local/bin/node"],
+        }],
         "extractor_args": {
             "youtube": {
-                "skip": ["hls", "dash"],
-                "player_client": ["android", "ios", "web"],
+                # Only skip HLS, keep DASH for better quality
+                "skip": ["hls"],
+                # Use clients that actually work with cookies
+                "player_client": ["web_music", "web", "android_music"],
             }
         },
         "postprocessors": [{
@@ -287,6 +294,10 @@ def get_ytdl_options():
             "preferredcodec": "m4a",
         }],
         "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+        },
     }
     
     if COOKIE_FILE and os.path.exists(COOKIE_FILE):
