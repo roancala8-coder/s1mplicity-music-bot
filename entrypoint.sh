@@ -4,9 +4,9 @@
 echo "Starting PO Token Provider..."
 bgutil-ytdlp-pot-provider &
 
-# Wait a moment for the provider to initialize
-sleep 3
+# Wait for the provider to fully start
+sleep 5
 
-# Start the bot
+# Now start the bot
 echo "Starting bot..."
 python main.py
