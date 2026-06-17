@@ -1,10 +1,7 @@
 FROM python:3.11-slim
 
 # Install git, ffmpeg, nodejs (required for PO token provider and EJS)
-RUN apt-get update && apt-get install -y git ffmpeg nodejs npm && rm -rf /var/lib/apt/lists/*
-
-# Install yt-dlp-ejs for JavaScript challenge solving
-RUN npm install -g yt-dlp-ejs
+RUN apt-get update && apt-get install -y git ffmpeg nodejs && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
