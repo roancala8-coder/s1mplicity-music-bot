@@ -1,10 +1,7 @@
 FROM python:3.11-slim
 
-# Install git, ffmpeg, nodejs (required for PO token provider and git-based pip install)
-RUN apt-get update && apt-get install -y git ffmpeg nodejs npm && rm -rf /var/lib/apt/lists/*
-
-# Install the PO token provider globally (Node.js version for better compatibility)
-RUN npm install -g bgutil-ytdlp-pot-provider
+# Install git, ffmpeg, nodejs (required for PO token provider)
+RUN apt-get update && apt-get install -y git ffmpeg nodejs && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
