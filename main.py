@@ -16,12 +16,14 @@ import threading
 
 def start_token_provider():
     try:
+        # Start the PO token provider as a subprocess
         subprocess.Popen(["bgutil-ytdlp-pot-provider"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(2)
-        print("[PO-TOKEN] Provider started successfully")
+        time.sleep(3)
+        print("[PO-TOKEN] ✅ Provider started successfully")
     except Exception as e:
-        print(f"[PO-TOKEN] Failed to start provider: {e}")
+        print(f"[PO-TOKEN] ❌ Failed to start provider: {e}")
 
+# Start provider in background thread
 threading.Thread(target=start_token_provider, daemon=True).start()
 
 # ============================================================
@@ -59,6 +61,7 @@ CYBERPUNK_COLOR = discord.Color.from_rgb(90, 20, 160)
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
 COOKIE_FILE = None
 
+# Try to load cookies from environment or file
 cookies_content = os.getenv("COOKIES_CONTENT")
 if cookies_content and len(cookies_content) > 100:
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
@@ -68,23 +71,7 @@ if cookies_content and len(cookies_content) > 100:
 else:
     COOKIE_FILE = os.path.join(BOT_DIR, "cookies.txt")
     if os.path.exists(COOKIE_FILE):
-        print(f"[CONFIG] ✅ Using cookies from local file")
-
-# ============================================================
-# IGNORE PREFIX COMMANDS
-# ============================================================
-
-@bot.event
-async def on_command_error(ctx, error):
-    if isinstance(error, commands.CommandNotFound):
-        return
-    raise error
-
-@bot.event
-async def on_message(message):
-    if message.content.startswith("!"):
-        return
-    await bot.process_commands(message)
+        print(f"[CONFIG] ✅ Using cookies from local file: {COOKIE_FILE}")
 
 # ============================================================
 # MUSIC STATE
@@ -253,17 +240,28 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - ULTRA SIMPLIFIED VERSION
+# YT-DLP OPTIONS - WITH PO TOKEN SUPPORT
 # ============================================================
 
 def get_ytdl_options():
     opts = {
-        "format": "bestaudio",
+        "format": "bestaudio/best",
         "quiet": True,
         "no_warnings": False,
         "noplaylist": True,
         "extract_flat": False,
+        "extractor_args": {
+            "youtube": {
+                "skip": ["hls"],
+                "player_client": ["ios", "android", "web"],
+                "formats": ["missing_pot"],  # Force use of formats that need PO tokens
+            }
+        },
         "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+        },
     }
     
     if COOKIE_FILE and os.path.exists(COOKIE_FILE):
@@ -274,7 +272,6 @@ def get_ytdl_options():
 
 def create_source(url: str):
     try:
-        # Fix search queries
         if not url.startswith(("http://", "https://")):
             url = f"ytsearch1:{url}"
             print(f"[YT-DLP] Search query: {url}")
@@ -287,42 +284,29 @@ def create_source(url: str):
             if info is None:
                 raise ValueError("Could not extract video info")
             
-            # Handle search results
             if "entries" in info:
                 if not info["entries"]:
-                    raise ValueError("No results found for that query")
+                    raise ValueError("No results found")
                 info = info["entries"][0]
             
-            # Try multiple approaches to get audio URL
             audio_url = None
             
-            # Approach 1: Direct URL
             if "url" in info:
                 audio_url = info["url"]
-            
-            # Approach 2: Best audio format
-            if not audio_url and "formats" in info:
+            elif "formats" in info:
+                # Get best audio format
                 for f in info["formats"]:
                     if f.get("acodec") != "none" and f.get("vcodec") == "none":
                         audio_url = f["url"]
                         break
-            
-            # Approach 3: Any format with audio
-            if not audio_url and "formats" in info:
-                for f in info["formats"]:
-                    if f.get("acodec") != "none":
-                        audio_url = f["url"]
-                        break
-            
-            # Approach 4: Use the first available URL
-            if not audio_url and "formats" in info:
-                for f in info["formats"]:
-                    if "url" in f:
-                        audio_url = f["url"]
-                        break
+                if not audio_url:
+                    for f in info["formats"]:
+                        if f.get("acodec") != "none":
+                            audio_url = f["url"]
+                            break
             
             if not audio_url:
-                raise ValueError("Could not extract audio URL from video")
+                raise ValueError("Could not extract audio URL")
             
             print(f"[YT-DLP] ✅ Extracted: {info.get('title', 'Unknown')}")
             return info, audio_url
@@ -330,15 +314,15 @@ def create_source(url: str):
     except yt_dlp.utils.DownloadError as e:
         error_msg = str(e)
         if "Sign in to confirm" in error_msg or "cookies" in error_msg.lower():
-            raise RuntimeError("⚠️ Age-restricted video or cookies expired. Update COOKIES_CONTENT in Railway.")
+            raise RuntimeError("⚠️ Age-restricted or cookies expired. Update COOKIES_CONTENT.")
         elif "Video unavailable" in error_msg:
-            raise RuntimeError("❌ Video is unavailable or private")
+            raise RuntimeError("❌ Video is unavailable")
         elif "Requested format" in error_msg:
-            raise RuntimeError("⚠️ Format error, try another video source")
+            raise RuntimeError("⚠️ Format unavailable. Try another video.")
         else:
             raise RuntimeError(f"YouTube error: {error_msg[:150]}")
     except Exception as e:
-        raise RuntimeError(f"Failed to load: {str(e)[:100]}")
+        raise RuntimeError(f"Failed: {str(e)[:100]}")
 
 # ============================================================
 # PLAYBACK ENGINE
@@ -400,7 +384,6 @@ async def start_playback(interaction: discord.Interaction, url: str):
     vc = guild.voice_client
     player = get_player(guild)
 
-    # Show "processing" message
     await interaction.followup.send("🎵 Processing your request...", ephemeral=False)
 
     try:
@@ -436,7 +419,6 @@ async def start_playback(interaction: discord.Interaction, url: str):
         embed = make_now_playing_embed(player)
         view = MusicControlView(player)
         
-        # Delete the processing message and send the now playing embed
         await interaction.delete_original_response()
         player.message = await interaction.followup.send(embed=embed, view=view)
     else:
