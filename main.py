@@ -253,40 +253,22 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - FIXED VERSION
+# YT-DLP OPTIONS - ULTRA SIMPLIFIED VERSION
 # ============================================================
 
 def get_ytdl_options():
     opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio[ext=webm]/bestaudio/best",
+        "format": "bestaudio",
         "quiet": True,
         "no_warnings": False,
         "noplaylist": True,
         "extract_flat": False,
-        "extractor_args": {
-            "youtube": {
-                "skip": ["hls", "dash"],
-                "player_client": ["web", "android"],
-            }
-        },
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }],
         "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "headers": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        },
     }
     
     if COOKIE_FILE and os.path.exists(COOKIE_FILE):
         opts["cookiefile"] = COOKIE_FILE
         print(f"[YT-DLP] ✅ Cookies loaded")
-    else:
-        print(f"[YT-DLP] ⚠️ No cookies found")
     
     return opts
 
@@ -311,25 +293,33 @@ def create_source(url: str):
                     raise ValueError("No results found for that query")
                 info = info["entries"][0]
             
-            # Get the best audio URL
+            # Try multiple approaches to get audio URL
             audio_url = None
             
-            # Try different approaches to get audio URL
+            # Approach 1: Direct URL
             if "url" in info:
                 audio_url = info["url"]
-            elif "formats" in info:
-                # Find best audio-only format
+            
+            # Approach 2: Best audio format
+            if not audio_url and "formats" in info:
                 for f in info["formats"]:
                     if f.get("acodec") != "none" and f.get("vcodec") == "none":
                         audio_url = f["url"]
                         break
-                
-                # Fallback to any format with audio
-                if not audio_url:
-                    for f in info["formats"]:
-                        if f.get("acodec") != "none":
-                            audio_url = f["url"]
-                            break
+            
+            # Approach 3: Any format with audio
+            if not audio_url and "formats" in info:
+                for f in info["formats"]:
+                    if f.get("acodec") != "none":
+                        audio_url = f["url"]
+                        break
+            
+            # Approach 4: Use the first available URL
+            if not audio_url and "formats" in info:
+                for f in info["formats"]:
+                    if "url" in f:
+                        audio_url = f["url"]
+                        break
             
             if not audio_url:
                 raise ValueError("Could not extract audio URL from video")
