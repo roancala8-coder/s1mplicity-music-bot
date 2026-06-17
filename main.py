@@ -571,9 +571,30 @@ async def on_ready():
         print(f"🍪 Cookies loaded")
 
 # ============================================================
-# RUN BOT
+# LOAD TOKEN FROM .env FILE DIRECTLY (FIXED)
 # ============================================================
-TOKEN = os.getenv("DISCORD_TOKEN")
+
+TOKEN = None
+
+# Try to read .env file manually
+env_path = "/home/container/.env"
+try:
+    with open(env_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith('DISCORD_TOKEN='):
+                TOKEN = line.split('=', 1)[1].strip()
+                print(f"[CONFIG] ✅ Loaded DISCORD_TOKEN from {env_path}")
+                break
+except FileNotFoundError:
+    print(f"[CONFIG] ❌ .env file not found at {env_path}")
+
+# If still not found, try environment variable
+if not TOKEN:
+    TOKEN = os.getenv("DISCORD_TOKEN")
+
 if not TOKEN:
     raise ValueError("DISCORD_TOKEN environment variable not set")
+
+print(f"[CONFIG] ✅ Token loaded (length: {len(TOKEN)} characters)")
 bot.run(TOKEN)
