@@ -7,24 +7,6 @@ import asyncio
 import time
 import shutil
 import tempfile
-import subprocess
-import threading
-
-# ============================================================
-# START PO TOKEN PROVIDER (runs in background)
-# ============================================================
-
-def start_token_provider():
-    try:
-        # Start the PO token provider as a subprocess
-        subprocess.Popen(["bgutil-ytdlp-pot-provider"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(3)
-        print("[PO-TOKEN] ✅ Provider started successfully")
-    except Exception as e:
-        print(f"[PO-TOKEN] ❌ Failed to start provider: {e}")
-
-# Start provider in background thread
-threading.Thread(target=start_token_provider, daemon=True).start()
 
 # ============================================================
 # CONFIGURATION - FFMPEG AUTO-DETECTION
@@ -240,23 +222,29 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - WITH PO TOKEN SUPPORT
+# YT-DLP OPTIONS - FIXED WITH EJS AND PROPER CLIENTS
 # ============================================================
 
 def get_ytdl_options():
     opts = {
-        "format": "bestaudio/best",
+        "format": "bestaudio[ext=m4a]/bestaudio/best",
         "quiet": True,
         "no_warnings": False,
         "noplaylist": True,
         "extract_flat": False,
+        # Enable remote EJS components from npm for JavaScript challenge solving
+        "remote_components": ["ejs:npm"],
         "extractor_args": {
             "youtube": {
                 "skip": ["hls"],
-                "player_client": ["ios", "android", "web"],
-                "formats": ["missing_pot"],  # Force use of formats that need PO tokens
+                # Use clients that work well with cookies and the PO provider
+                "player_client": ["web", "web_music"],
             }
         },
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "m4a",
+        }],
         "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "headers": {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
