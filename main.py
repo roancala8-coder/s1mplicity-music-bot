@@ -7,6 +7,12 @@ import asyncio
 import time
 import shutil
 import tempfile
+from dotenv import load_dotenv
+
+# ============================================================
+# LOAD ENVIRONMENT VARIABLES
+# ============================================================
+load_dotenv()
 
 # ============================================================
 # CONFIGURATION - FFMPEG AUTO-DETECTION
@@ -232,12 +238,10 @@ def get_ytdl_options():
         "no_warnings": False,
         "noplaylist": True,
         "extract_flat": False,
-        # Enable remote EJS components from npm for JavaScript challenge solving
         "remote_components": ["ejs:npm"],
         "extractor_args": {
             "youtube": {
                 "skip": ["hls"],
-                # Use clients that work well with cookies and the PO provider
                 "player_client": ["web", "web_music"],
             }
         },
@@ -282,7 +286,6 @@ def create_source(url: str):
             if "url" in info:
                 audio_url = info["url"]
             elif "formats" in info:
-                # Get best audio format
                 for f in info["formats"]:
                     if f.get("acodec") != "none" and f.get("vcodec") == "none":
                         audio_url = f["url"]
