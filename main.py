@@ -253,76 +253,102 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS WITH PO TOKEN SUPPORT
+# YT-DLP OPTIONS - FIXED VERSION
 # ============================================================
 
 def get_ytdl_options():
     opts = {
-        "format": "bestaudio/best",
+        "format": "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio[ext=webm]/bestaudio/best",
         "quiet": True,
-        "no_warnings": True,
+        "no_warnings": False,
         "noplaylist": True,
         "extract_flat": False,
-        "js_runtimes": {"node": {}},
+        "extractor_args": {
+            "youtube": {
+                "skip": ["hls", "dash"],
+                "player_client": ["web", "android"],
+            }
+        },
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }],
         "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "headers": {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept-Language": "en-US,en;q=0.9",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
-        "extractor_args": {
-            "youtube": {
-                "skip": ["dash"],
-                "player_client": ["ios", "android"],
-                "po_token": "web+{}",
-                "visitor_data": "{}",
-            }
-        },
     }
     
     if COOKIE_FILE and os.path.exists(COOKIE_FILE):
         opts["cookiefile"] = COOKIE_FILE
         print(f"[YT-DLP] ✅ Cookies loaded")
+    else:
+        print(f"[YT-DLP] ⚠️ No cookies found")
     
     return opts
 
 def create_source(url: str):
     try:
+        # Fix search queries
+        if not url.startswith(("http://", "https://")):
+            url = f"ytsearch1:{url}"
+            print(f"[YT-DLP] Search query: {url}")
+        
         ytdl_opts = get_ytdl_options()
         
         with yt_dlp.YoutubeDL(ytdl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
+            
             if info is None:
                 raise ValueError("Could not extract video info")
             
+            # Handle search results
             if "entries" in info:
                 if not info["entries"]:
                     raise ValueError("No results found for that query")
                 info = info["entries"][0]
             
-            if "url" not in info and "formats" in info:
-                for f in info.get("formats", []):
+            # Get the best audio URL
+            audio_url = None
+            
+            # Try different approaches to get audio URL
+            if "url" in info:
+                audio_url = info["url"]
+            elif "formats" in info:
+                # Find best audio-only format
+                for f in info["formats"]:
                     if f.get("acodec") != "none" and f.get("vcodec") == "none":
-                        info["url"] = f["url"]
+                        audio_url = f["url"]
                         break
+                
+                # Fallback to any format with audio
+                if not audio_url:
+                    for f in info["formats"]:
+                        if f.get("acodec") != "none":
+                            audio_url = f["url"]
+                            break
             
-            if "url" not in info:
-                raise ValueError("Could not extract audio URL")
+            if not audio_url:
+                raise ValueError("Could not extract audio URL from video")
             
-            return info, info["url"]
+            print(f"[YT-DLP] ✅ Extracted: {info.get('title', 'Unknown')}")
+            return info, audio_url
             
     except yt_dlp.utils.DownloadError as e:
         error_msg = str(e)
-        if "Sign in to confirm" in error_msg:
-            raise RuntimeError("Age-restricted video. Cookies expired or PO token failed.")
+        if "Sign in to confirm" in error_msg or "cookies" in error_msg.lower():
+            raise RuntimeError("⚠️ Age-restricted video or cookies expired. Update COOKIES_CONTENT in Railway.")
         elif "Video unavailable" in error_msg:
-            raise RuntimeError("Video is unavailable")
+            raise RuntimeError("❌ Video is unavailable or private")
         elif "Requested format" in error_msg:
-            raise RuntimeError("YouTube format error. Try another song.")
+            raise RuntimeError("⚠️ Format error, try another video source")
         else:
-            raise RuntimeError(f"YouTube error: {error_msg[:100]}")
+            raise RuntimeError(f"YouTube error: {error_msg[:150]}")
     except Exception as e:
-        raise RuntimeError(f"Failed: {str(e)[:100]}")
+        raise RuntimeError(f"Failed to load: {str(e)[:100]}")
 
 # ============================================================
 # PLAYBACK ENGINE
@@ -384,10 +410,13 @@ async def start_playback(interaction: discord.Interaction, url: str):
     vc = guild.voice_client
     player = get_player(guild)
 
+    # Show "processing" message
+    await interaction.followup.send("🎵 Processing your request...", ephemeral=False)
+
     try:
         info, audio_url = create_source(url)
     except RuntimeError as e:
-        await interaction.followup.send(f"❌ {e}", ephemeral=True)
+        await interaction.followup.send(f"❌ {e}", ephemeral=False)
         return
 
     if not vc.is_playing() and not player.current:
@@ -404,7 +433,7 @@ async def start_playback(interaction: discord.Interaction, url: str):
         try:
             source = discord.FFmpegPCMAudio(audio_url, executable=FFMPEG_PATH, **ffmpeg_opts)
         except Exception as e:
-            await interaction.followup.send(f"FFmpeg error: {e}", ephemeral=True)
+            await interaction.followup.send(f"❌ FFmpeg error: {e}", ephemeral=False)
             return
 
         def after_play(error):
@@ -416,6 +445,9 @@ async def start_playback(interaction: discord.Interaction, url: str):
 
         embed = make_now_playing_embed(player)
         view = MusicControlView(player)
+        
+        # Delete the processing message and send the now playing embed
+        await interaction.delete_original_response()
         player.message = await interaction.followup.send(embed=embed, view=view)
     else:
         player.queue.append({"info": info, "url": audio_url})
@@ -443,9 +475,6 @@ async def slash_play(interaction: discord.Interaction, query: str):
             await interaction.followup.send("❌ Join a voice channel first.", ephemeral=True)
             return
         await interaction.user.voice.channel.connect(self_deaf=True)
-    
-    if not query.startswith(("http://", "https://")):
-        query = f"ytsearch:{query}"
     
     await start_playback(interaction, query)
 
