@@ -1,10 +1,3 @@
-# FULLY FIXED SCRIPT - subprocess IMPORT ADDED
-# Add this import at the very top of your file:
-
-import subprocess
-
-# Then the complete fixed script:
-
 import os
 import discord
 from discord.ext import commands, tasks
@@ -15,7 +8,15 @@ import time
 import shutil
 import platform
 import sys
-import subprocess  # <-- ADD THIS LINE
+import subprocess
+
+# ============================================================
+# LOAD ENVIRONMENT VARIABLES
+# ============================================================
+
+TOKEN = os.getenv("DISCORD_TOKEN")
+if not TOKEN:
+    raise ValueError("DISCORD_TOKEN environment variable not set. Please set it in Railway variables.")
 
 # ============================================================
 # CONFIGURATION - FFMPEG AUTO-DETECTION
@@ -39,7 +40,7 @@ def find_ffmpeg():
     
     return "ffmpeg"
 
-FFMPEG_PATH = find_ffmpeg()
+FFMPEG_PATH = os.getenv("FFMPEG_PATH", find_ffmpeg())
 print(f"[CONFIG] FFmpeg path: {FFMPEG_PATH}")
 
 # Verify FFmpeg works
@@ -59,7 +60,7 @@ CYBERPUNK_COLOR = discord.Color.from_rgb(90, 20, 160)
 # ============================================================
 
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
-COOKIE_FILE = os.path.join(BOT_DIR, "cookies.txt")
+COOKIE_FILE = os.getenv("COOKIE_PATH", os.path.join(BOT_DIR, "cookies.txt"))
 if os.path.exists(COOKIE_FILE):
     print(f"[CONFIG] ✅ Using cookies from: {COOKIE_FILE}")
 else:
@@ -594,8 +595,6 @@ async def on_ready():
 # ============================================================
 # RUN BOT
 # ============================================================
-
-TOKEN = "MTUxMzE2NTE1MDk0NzkwMTU1MA.GNuuea.q46e2GW3HcUdfHLk6U1PHQKpsjJ31rP-6NnDQc"
 
 if not TOKEN:
     raise ValueError("DISCORD_TOKEN environment variable not set")
