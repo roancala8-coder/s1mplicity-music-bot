@@ -1,3 +1,10 @@
+# FULLY FIXED SCRIPT - subprocess IMPORT ADDED
+# Add this import at the very top of your file:
+
+import subprocess
+
+# Then the complete fixed script:
+
 import os
 import discord
 from discord.ext import commands, tasks
@@ -6,13 +13,9 @@ import yt_dlp
 import asyncio
 import time
 import shutil
-import tempfile
-from dotenv import load_dotenv
-
-# ============================================================
-# LOAD ENVIRONMENT VARIABLES
-# ============================================================
-load_dotenv()
+import platform
+import sys
+import subprocess  # <-- ADD THIS LINE
 
 # ============================================================
 # CONFIGURATION - FFMPEG AUTO-DETECTION
@@ -20,12 +23,14 @@ load_dotenv()
 
 def find_ffmpeg():
     if shutil.which("ffmpeg"):
-        return "ffmpeg"
+        return shutil.which("ffmpeg")
     
     common_paths = [
         r"C:\ffmpeg\bin\ffmpeg.exe",
         r"C:\Program Files\ffmpeg\bin\ffmpeg.exe",
-        os.path.expanduser(r"~\ffmpeg\bin\ffmpeg.exe")
+        os.path.expanduser(r"~\ffmpeg\bin\ffmpeg.exe"),
+        r"C:\ffmpeg\ffmpeg.exe",
+        r"C:\ffmpeg\bin\ffmpeg.exe"
     ]
     
     for path in common_paths:
@@ -34,8 +39,15 @@ def find_ffmpeg():
     
     return "ffmpeg"
 
-FFMPEG_PATH = os.getenv("FFMPEG_PATH", find_ffmpeg())
+FFMPEG_PATH = find_ffmpeg()
 print(f"[CONFIG] FFmpeg path: {FFMPEG_PATH}")
+
+# Verify FFmpeg works
+try:
+    subprocess.run([FFMPEG_PATH, "-version"], capture_output=True, check=True)
+    print("[CONFIG] ✅ FFmpeg is working")
+except:
+    print("[CONFIG] ❌ FFmpeg not found or not working - install FFmpeg")
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -47,19 +59,11 @@ CYBERPUNK_COLOR = discord.Color.from_rgb(90, 20, 160)
 # ============================================================
 
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
-COOKIE_FILE = None
-
-# Try to load cookies from environment or file
-cookies_content = os.getenv("COOKIES_CONTENT")
-if cookies_content and len(cookies_content) > 100:
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
-        f.write(cookies_content)
-        COOKIE_FILE = f.name
-    print(f"[CONFIG] ✅ Using cookies from COOKIES_CONTENT env var")
+COOKIE_FILE = os.path.join(BOT_DIR, "cookies.txt")
+if os.path.exists(COOKIE_FILE):
+    print(f"[CONFIG] ✅ Using cookies from: {COOKIE_FILE}")
 else:
-    COOKIE_FILE = os.path.join(BOT_DIR, "cookies.txt")
-    if os.path.exists(COOKIE_FILE):
-        print(f"[CONFIG] ✅ Using cookies from local file: {COOKIE_FILE}")
+    print(f"[CONFIG] ⚠️ No cookies.txt found")
 
 # ============================================================
 # MUSIC STATE
@@ -75,7 +79,10 @@ class MusicPlayer:
         self.start_time = None
         self.duration = None
         self.message = None
-        self.volume = 1.0
+        self.volume = 0.5
+        self.thumbnail = None
+        self.title = None
+        self.uploader = None
 
     def toggle_loop(self):
         self.loop = not self.loop
@@ -176,9 +183,9 @@ def make_now_playing_embed(player: MusicPlayer):
             color=CYBERPUNK_COLOR
         )
 
-    title = info.get("title", "Unknown Title")
-    uploader = info.get("uploader", "Unknown Artist")
-    thumb = info.get("thumbnail")
+    title = player.title or info.get("title", "Unknown Title")
+    uploader = player.uploader or info.get("uploader", "Unknown Artist")
+    thumb = player.thumbnail or info.get("thumbnail")
     duration = player.duration or 0
 
     if player.start_time and not player.is_paused:
@@ -228,37 +235,38 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS - FIXED WITH EJS AND PROPER CLIENTS
+# YT-DLP OPTIONS
 # ============================================================
 
 def get_ytdl_options():
     opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio/best",
+        "format": "bestaudio/best",
         "quiet": True,
         "no_warnings": False,
         "noplaylist": True,
         "extract_flat": False,
-        "remote_components": ["ejs:npm"],
         "extractor_args": {
             "youtube": {
-                "skip": ["hls"],
-                "player_client": ["web", "web_music"],
+                "player_client": ["android"],
+                "skip": ["dash", "hls"]
             }
         },
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "m4a",
-        }],
-        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
         "headers": {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept-Language": "en-US,en;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
+        "socket_timeout": 30,
+        "retries": 10,
+        "fragment_retries": 10,
+        "ignoreerrors": True
     }
     
     if COOKIE_FILE and os.path.exists(COOKIE_FILE):
         opts["cookiefile"] = COOKIE_FILE
         print(f"[YT-DLP] ✅ Cookies loaded")
+    else:
+        print(f"[YT-DLP] ⚠️ No cookies file found")
     
     return opts
 
@@ -281,6 +289,10 @@ def create_source(url: str):
                     raise ValueError("No results found")
                 info = info["entries"][0]
             
+            thumbnail = info.get("thumbnail")
+            if not thumbnail and "thumbnails" in info and info["thumbnails"]:
+                thumbnail = info["thumbnails"][-1]["url"]
+            
             audio_url = None
             
             if "url" in info:
@@ -299,25 +311,18 @@ def create_source(url: str):
             if not audio_url:
                 raise ValueError("Could not extract audio URL")
             
+            info["thumbnail"] = thumbnail
+            
             print(f"[YT-DLP] ✅ Extracted: {info.get('title', 'Unknown')}")
             return info, audio_url
             
-    except yt_dlp.utils.DownloadError as e:
-        error_msg = str(e)
-        if "Sign in to confirm" in error_msg or "cookies" in error_msg.lower():
-            raise RuntimeError("⚠️ Age-restricted or cookies expired. Update COOKIES_CONTENT.")
-        elif "Video unavailable" in error_msg:
-            raise RuntimeError("❌ Video is unavailable")
-        elif "Requested format" in error_msg:
-            raise RuntimeError("⚠️ Format unavailable. Try another video.")
-        else:
-            raise RuntimeError(f"YouTube error: {error_msg[:150]}")
     except Exception as e:
         raise RuntimeError(f"Failed: {str(e)[:100]}")
 
 # ============================================================
 # PLAYBACK ENGINE
 # ============================================================
+
 async def play_next(guild: discord.Guild):
     vc = guild.voice_client
     if not vc:
@@ -334,6 +339,9 @@ async def play_next(guild: discord.Guild):
             player.audio_url = None
             player.start_time = None
             player.duration = None
+            player.thumbnail = None
+            player.title = None
+            player.uploader = None
             return
 
         next_track = player.queue.pop(0)
@@ -345,17 +353,24 @@ async def play_next(guild: discord.Guild):
     player.duration = info.get("duration", 0)
     player.start_time = time.time()
     player.is_paused = False
+    player.thumbnail = info.get("thumbnail")
+    player.title = info.get("title")
+    player.uploader = info.get("uploader")
 
-    ffmpeg_opts = {
-        "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-        "options": f"-vn -filter:a volume={player.volume}"
-    }
-    
     try:
-        source = discord.FFmpegPCMAudio(audio_url, executable=FFMPEG_PATH, **ffmpeg_opts)
+        source = discord.FFmpegPCMAudio(
+            audio_url,
+            executable=FFMPEG_PATH,
+            before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+            options="-vn -b:a 128k"
+        )
     except Exception as e:
         print(f"FFmpeg error: {e}")
-        return
+        try:
+            source = discord.FFmpegPCMAudio(audio_url, executable=FFMPEG_PATH)
+        except Exception as e2:
+            print(f"Fallback failed: {e2}")
+            return
 
     def after_play(error):
         if error:
@@ -383,19 +398,23 @@ async def start_playback(interaction: discord.Interaction, url: str):
         await interaction.followup.send(f"❌ {e}", ephemeral=False)
         return
 
+    player.thumbnail = info.get("thumbnail")
+    player.title = info.get("title")
+    player.uploader = info.get("uploader")
+
     if not vc.is_playing() and not player.current:
         player.current = info
         player.audio_url = audio_url
         player.duration = info.get("duration", 0)
         player.start_time = time.time()
 
-        ffmpeg_opts = {
-            "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-            "options": f"-vn -filter:a volume={player.volume}"
-        }
-        
         try:
-            source = discord.FFmpegPCMAudio(audio_url, executable=FFMPEG_PATH, **ffmpeg_opts)
+            source = discord.FFmpegPCMAudio(
+                audio_url,
+                executable=FFMPEG_PATH,
+                before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+                options="-vn -b:a 128k"
+            )
         except Exception as e:
             await interaction.followup.send(f"❌ FFmpeg error: {e}", ephemeral=False)
             return
@@ -569,29 +588,14 @@ async def on_ready():
     
     if COOKIE_FILE and os.path.exists(COOKIE_FILE):
         print(f"🍪 Cookies loaded")
+    else:
+        print(f"🍪 No cookies file found")
 
 # ============================================================
-# LOAD TOKEN FROM .env FILE DIRECTLY (FIXED)
+# RUN BOT
 # ============================================================
 
-TOKEN = None
-
-# Try to read .env file manually
-env_path = "/home/container/.env"
-try:
-    with open(env_path, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith('DISCORD_TOKEN='):
-                TOKEN = line.split('=', 1)[1].strip()
-                print(f"[CONFIG] ✅ Loaded DISCORD_TOKEN from {env_path}")
-                break
-except FileNotFoundError:
-    print(f"[CONFIG] ❌ .env file not found at {env_path}")
-
-# If still not found, try environment variable
-if not TOKEN:
-    TOKEN = os.getenv("DISCORD_TOKEN")
+TOKEN = "MTUxMzE2NTE1MDk0NzkwMTU1MA.GNuuea.q46e2GW3HcUdfHLk6U1PHQKpsjJ31rP-6NnDQc"
 
 if not TOKEN:
     raise ValueError("DISCORD_TOKEN environment variable not set")
