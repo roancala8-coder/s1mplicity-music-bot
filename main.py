@@ -12,10 +12,10 @@ if not TOKEN:
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Lavalink connection info (Railway domain + port 8080)
+# Lavalink connection info - FIXED for Railway private networking
 LAVALINK_URI = os.getenv(
     "LAVALINK_URI",
-    "http://discord-music-bot-production-340f.up.railway.app:8080"
+    "http://discord-music-bot.railway.internal:2333"   # ← Correct private address + default Lavalink port
 )
 LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD", "youshallnotpass")
 
@@ -31,20 +31,30 @@ async def on_ready():
 @bot.event
 async def setup_hook():
     print("🔄 Setting up Lavalink connection...")
-    print(f"🔗 LAVALINK_URI: {LAVALINK_URI}")
-    print(f"🔑 LAVALINK_PASSWORD: {'*' * len(LAVALINK_PASSWORD)}")
+    print(f"🔗 Using LAVALINK_URI: {LAVALINK_URI}")
+    print(f"🔑 Password length: {len(LAVALINK_PASSWORD)}")
     
-    try:
-        node = wavelink.Node(
-            uri=LAVALINK_URI,
-            password=LAVALINK_PASSWORD,
-            secure=False,   # force plain HTTP
-            timeout=30
-        )
-        await wavelink.Pool.connect(client=bot, nodes=[node])
-        print("🔊 Connected to Lavalink")
-    except Exception as e:
-        print(f"❌ Failed to connect to Lavalink: {e}")
+    retries = 0
+    max_retries = 5
+    
+    while retries < max_retries:
+        try:
+            node = wavelink.Node(
+                uri=LAVALINK_URI,
+                password=LAVALINK_PASSWORD,
+                secure=False,      # Railway internal = HTTP
+                timeout=30
+            )
+            await wavelink.Pool.connect(client=bot, nodes=[node])
+            print("🔊 Successfully connected to Lavalink!")
+            return
+        except Exception as e:
+            retries += 1
+            print(f"❌ Lavalink connection attempt {retries}/{max_retries} failed: {e}")
+            if retries < max_retries:
+                await asyncio.sleep(5)
+            else:
+                print("❌ All Lavalink connection attempts failed. Check Lavalink service logs.")
 
 # Slash commands
 @bot.tree.command(name="join", description="Join your voice channel")
@@ -170,8 +180,7 @@ async def slash_status(interaction: discord.Interaction):
     status = "✅ Bot is running\n"
     
     try:
-        pool = wavelink.Pool.get_client(interaction.guild.id if interaction.guild else None)
-        if pool:
+        if wavelink.Pool.nodes:
             status += "🔊 Connected to Lavalink\n"
         else:
             status += "❌ Not connected to Lavalink\n"

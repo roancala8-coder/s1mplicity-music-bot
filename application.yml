@@ -1,31 +1,32 @@
 server:
-  port: ${PORT:2333}     # Railway injects PORT, fallback 2333
-  address: 0.0.0.0       # must bind to all interfaces
+  port: 2333
+  address: 0.0.0.0
 
 lavalink:
   server:
-    password: ${SERVER_PASSWORD:youshallnotpass}  # use Railway env var
+    password: "youshallnotpass"   # Change this
     sources:
       youtube: true
-      soundcloud: false
-      bandcamp: false
-      twitch: false
-      vimeo: false
-      mixcloud: false
-      http: false
-    bufferDurationMs: 400
-    frameBufferDurationMs: 5000
-    youtubePlaylistLoadLimit: 6
-    playerUpdateInterval: 5
-    youtubeSearchEnabled: true
-    soundcloudSearchEnabled: false
-    gc-warning: true
+      soundcloud: true
+      bandcamp: true
+      twitch: true
+      vimeo: true
+      http: true
+    filters:
+      volume: true
+      equalizer: true
+      karaoke: true
+      timescale: true
+      tremolo: true
+      vibrato: true
+      rotation: true
+      distortion: true
+      channelmix: true
+      lowpass: true
+    frameBufferDurationMs: 4000
+    opus: true
 
 logging:
-  file:
-    path: ./logs/
   level:
     root: INFO
     lavalink: INFO
-    lavaplayer: INFO
-    lavaplayer-events: INFO
