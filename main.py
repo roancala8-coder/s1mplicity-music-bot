@@ -159,4 +159,20 @@ async def slash_nowplaying(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("❌ Nothing playing", ephemeral=True)
 
+@bot.tree.command(name="status", description="Check bot and Lavalink status")
+async def slash_status(interaction: discord.Interaction):
+    status = "✅ Bot is running\n"
+    
+    # Check Lavalink connection
+    try:
+        pool = wavelink.Pool.get_client(interaction.guild.id if interaction.guild else None)
+        if pool:
+            status += "🔊 Connected to Lavalink\n"
+        else:
+            status += "❌ Not connected to Lavalink\n"
+    except:
+        status += "❌ Not connected to Lavalink\n"
+    
+    await interaction.response.send_message(status, ephemeral=True)
+
 bot.run(TOKEN)
