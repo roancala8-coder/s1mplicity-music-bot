@@ -3,21 +3,26 @@ import discord
 from discord.ext import commands
 import wavelink
 import asyncio
+import sys
 
-# Bot token from Railway variables
+print("🚀 Script starting...")
+print(f"Python version: {sys.version}")
+
 TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:
+    print("❌ DISCORD_TOKEN not found!")
     raise ValueError("DISCORD_TOKEN environment variable not set")
+
+print("✅ DISCORD_TOKEN loaded")
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Lavalink connection info - FIXED for Railway private networking
-LAVALINK_URI = os.getenv(
-    "LAVALINK_URI",
-    "http://discord-music-bot.railway.internal:2333"   # ← Correct private address + default Lavalink port
-)
+LAVALINK_URI = os.getenv("LAVALINK_URI", "http://discord-music-bot.railway.internal:2333")
 LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD", "youshallnotpass")
+
+print(f"🔗 LAVALINK_URI = {LAVALINK_URI}")
+print(f"🔑 Password length = {len(LAVALINK_PASSWORD)}")
 
 @bot.event
 async def on_ready():
@@ -30,43 +35,36 @@ async def on_ready():
 
 @bot.event
 async def setup_hook():
-    print("🔄 Setting up Lavalink connection...")
-    print(f"🔗 Using LAVALINK_URI: {LAVALINK_URI}")
-    print(f"🔑 Password length: {len(LAVALINK_PASSWORD)}")
-    
+    print("🔄 setup_hook triggered - Connecting to Lavalink...")
     retries = 0
-    max_retries = 5
+    max_retries = 8
     
     while retries < max_retries:
         try:
             node = wavelink.Node(
                 uri=LAVALINK_URI,
                 password=LAVALINK_PASSWORD,
-                secure=False,      # Railway internal = HTTP
+                secure=False,
                 timeout=30
             )
             await wavelink.Pool.connect(client=bot, nodes=[node])
-            print("🔊 Successfully connected to Lavalink!")
+            print("🎉 Successfully connected to Lavalink!")
             return
         except Exception as e:
             retries += 1
-            print(f"❌ Lavalink connection attempt {retries}/{max_retries} failed: {e}")
-            if retries < max_retries:
-                await asyncio.sleep(5)
-            else:
-                print("❌ All Lavalink connection attempts failed. Check Lavalink service logs.")
+            print(f"❌ Attempt {retries}/{max_retries} failed: {type(e).__name__} - {e}")
+            await asyncio.sleep(4)
 
-# Slash commands
+# ==================== SLASH COMMANDS ====================
+
 @bot.tree.command(name="join", description="Join your voice channel")
 async def slash_join(interaction: discord.Interaction):
     if not interaction.user.voice:
         await interaction.response.send_message("❌ You need to be in a voice channel!", ephemeral=True)
         return
-    
     if interaction.guild.voice_client:
         await interaction.response.send_message("❌ Already in a voice channel!", ephemeral=True)
         return
-    
     try:
         await interaction.user.voice.channel.connect(cls=wavelink.Player)
         await interaction.response.send_message(f"✅ Joined **{interaction.user.voice.channel.name}**")
@@ -76,11 +74,9 @@ async def slash_join(interaction: discord.Interaction):
 @bot.tree.command(name="play", description="Play a song from YouTube")
 async def slash_play(interaction: discord.Interaction, query: str):
     await interaction.response.defer(thinking=True)
-    
     if not interaction.user.voice:
         await interaction.followup.send("❌ You need to be in a voice channel!")
         return
-    
     vc = interaction.guild.voice_client
     if not vc:
         try:
@@ -88,14 +84,12 @@ async def slash_play(interaction: discord.Interaction, query: str):
         except Exception as e:
             await interaction.followup.send(f"❌ Failed to connect: {str(e)}")
             return
-    
     try:
         tracks = await wavelink.Playable.search(query, source="youtube")
         if not tracks:
             await interaction.followup.send("❌ No tracks found!")
             return
-        
-        track = tracks[0] if not isinstance(tracks, list) else tracks[0]
+        track = tracks[0]
         await vc.play(track)
         await interaction.followup.send(f"▶️ Now playing: **{track.title}**")
     except Exception as e:
@@ -147,46 +141,16 @@ async def slash_leave(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("❌ Not in voice", ephemeral=True)
 
-@bot.tree.command(name="volume", description="Set volume (0-100)")
-async def slash_volume(interaction: discord.Interaction, level: int):
-    if level < 0 or level > 100:
-        await interaction.response.send_message("❌ Volume must be between 0 and 100", ephemeral=True)
-        return
-    
-    vc = interaction.guild.voice_client
-    if vc and vc.current:
-        await vc.set_volume(level)
-        await interaction.response.send_message(f"🔊 Volume set to {level}%")
-    else:
-        await interaction.response.send_message("❌ Nothing playing", ephemeral=True)
-
-@bot.tree.command(name="nowplaying", description="Show current song")
-async def slash_nowplaying(interaction: discord.Interaction):
-    vc = interaction.guild.voice_client
-    if vc and vc.current:
-        track = vc.current
-        embed = discord.Embed(
-            title="🎵 Now Playing",
-            description=f"**{track.title}**",
-            color=discord.Color.blue()
-        )
-        embed.add_field(name="Duration", value=f"{int(track.length / 60)}:{int(track.length % 60):02d}")
-        await interaction.response.send_message(embed=embed)
-    else:
-        await interaction.response.send_message("❌ Nothing playing", ephemeral=True)
-
 @bot.tree.command(name="status", description="Check bot and Lavalink status")
 async def slash_status(interaction: discord.Interaction):
     status = "✅ Bot is running\n"
-    
     try:
-        if wavelink.Pool.nodes:
-            status += "🔊 Connected to Lavalink\n"
+        if len(wavelink.Pool.nodes) > 0:
+            status += "🔊 Lavalink Connected"
         else:
-            status += "❌ Not connected to Lavalink\n"
+            status += "❌ Lavalink Not Connected"
     except:
-        status += "❌ Not connected to Lavalink\n"
-    
+        status += "❌ Lavalink Check Failed"
     await interaction.response.send_message(status, ephemeral=True)
 
 bot.run(TOKEN)
