@@ -26,6 +26,10 @@ async def on_ready():
 
 @bot.event
 async def setup_hook():
+    print("🔄 Setting up Lavalink connection...")
+    print(f"🔗 LAVALINK_URI: {LAVALINK_URI}")
+    print(f"🔑 LAVALINK_PASSWORD: {'*' * len(LAVALINK_PASSWORD)}")
+    
     try:
         node = wavelink.Node(
             uri=LAVALINK_URI,
