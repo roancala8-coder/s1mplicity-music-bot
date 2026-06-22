@@ -41,6 +41,18 @@ async def setup_hook():
     except Exception as e:
         print(f"❌ Failed to connect to Lavalink: {e}")
 
+@bot.command(name="sync", description="Sync slash commands (owner only)")
+async def sync_commands(ctx):
+    if ctx.author.id != 1088102875198148728:
+        await ctx.send("❌ You're not the owner!")
+        return
+    
+    try:
+        await bot.tree.sync()
+        await ctx.send("✅ Commands synced!")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to sync: {e}")
+
 @bot.tree.command(name="join", description="Join your voice channel")
 async def slash_join(interaction: discord.Interaction):
     if not interaction.user.voice:
