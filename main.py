@@ -4,6 +4,7 @@ from discord.ext import commands
 import wavelink
 import asyncio
 
+# Bot token from Railway variables
 TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:
     raise ValueError("DISCORD_TOKEN environment variable not set")
@@ -11,8 +12,11 @@ if not TOKEN:
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Lavalink connection info
-LAVALINK_URI = os.getenv("LAVALINK_URI", "http://localhost:2333")
+# Lavalink connection info (Railway domain + port)
+LAVALINK_URI = os.getenv(
+    "LAVALINK_URI",
+    "http://discord-music-bot-production-340f.up.railway.app:2333"
+)
 LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD", "youshallnotpass")
 
 @bot.event
@@ -41,23 +45,7 @@ async def setup_hook():
     except Exception as e:
         print(f"❌ Failed to connect to Lavalink: {e}")
 
-@bot.command(name="sync", description="Sync slash commands (owner only)")
-async def sync_commands(ctx):
-    if ctx.author.id != 1088102875198148728:
-        await ctx.send("❌ You're not the owner!")
-        return
-    
-    try:
-        # Sync to the current guild for instant results
-        if ctx.guild:
-            await bot.tree.sync(guild=ctx.guild)
-            await ctx.send(f"✅ Commands synced to **{ctx.guild.name}**!")
-        else:
-            await bot.tree.sync()
-            await ctx.send("✅ Commands synced globally (may take up to an hour)")
-    except Exception as e:
-        await ctx.send(f"❌ Failed to sync: {e}")
-
+# Slash commands
 @bot.tree.command(name="join", description="Join your voice channel")
 async def slash_join(interaction: discord.Interaction):
     if not interaction.user.voice:
@@ -180,7 +168,6 @@ async def slash_nowplaying(interaction: discord.Interaction):
 async def slash_status(interaction: discord.Interaction):
     status = "✅ Bot is running\n"
     
-    # Check Lavalink connection
     try:
         pool = wavelink.Pool.get_client(interaction.guild.id if interaction.guild else None)
         if pool:

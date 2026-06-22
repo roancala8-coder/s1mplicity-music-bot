@@ -1,10 +1,10 @@
 server:
-  port: 2333
-  address: 0.0.0.0
+  port: ${PORT:2333}     # Railway injects PORT, fallback 2333
+  address: 0.0.0.0       # must bind to all interfaces
 
 lavalink:
   server:
-    password: "youshallnotpass"
+    password: ${SERVER_PASSWORD:youshallnotpass}  # use Railway env var
     sources:
       youtube: true
       soundcloud: false
