@@ -48,8 +48,13 @@ async def sync_commands(ctx):
         return
     
     try:
-        await bot.tree.sync()
-        await ctx.send("✅ Commands synced!")
+        # Sync to the current guild for instant results
+        if ctx.guild:
+            await bot.tree.sync(guild=ctx.guild)
+            await ctx.send(f"✅ Commands synced to **{ctx.guild.name}**!")
+        else:
+            await bot.tree.sync()
+            await ctx.send("✅ Commands synced globally (may take up to an hour)")
     except Exception as e:
         await ctx.send(f"❌ Failed to sync: {e}")
 
