@@ -27,3 +27,5 @@ logging:
   level:
     root: INFO
     lavalink: INFO
+    lavaplayer: INFO
+    lavaplayer-events: INFO
