@@ -33,12 +33,10 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Sync failed: {e}")
 
-@bot.event
-async def setup_hook():
-    print("🔄 setup_hook triggered - Connecting to Lavalink...")
+    # Lavalink connection moved here for reliability
+    print("🔄 Connecting to Lavalink from on_ready...")
     retries = 0
-    max_retries = 8
-    
+    max_retries = 10
     while retries < max_retries:
         try:
             node = wavelink.Node(
@@ -49,11 +47,13 @@ async def setup_hook():
             )
             await wavelink.Pool.connect(client=bot, nodes=[node])
             print("🎉 Successfully connected to Lavalink!")
-            return
+            break
         except Exception as e:
             retries += 1
             print(f"❌ Attempt {retries}/{max_retries} failed: {type(e).__name__} - {e}")
-            await asyncio.sleep(4)
+            await asyncio.sleep(5)
+    else:
+        print("❌ Failed to connect to Lavalink after all retries.")
 
 # ==================== SLASH COMMANDS ====================
 
