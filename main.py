@@ -248,9 +248,8 @@ def get_ytdl_options():
         "extract_flat": False,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "ios", "web_creator", "tv_embedded"],
-                "skip": ["dash", "hls"],
-                "pot": ["disabled"]
+                "player_client": ["android", "ios", "web_creator"],
+                "skip": ["dash", "hls"]
             }
         },
         "postprocessors": [{
@@ -334,25 +333,7 @@ def create_source(url: str):
             raise RuntimeError("⚠️ Age-restricted. Try using cookies.txt or a different video.")
         elif "Video unavailable" in error_msg:
             raise RuntimeError("❌ Video is unavailable. Try another.")
-        elif "SABR" in error_msg:
-            # Fallback to basic extraction
-            try:
-                fallback_opts = {
-                    "format": "bestaudio",
-                    "quiet": True,
-                    "noplaylist": True,
-                    "extractor_args": {"youtube": {"player_client": ["web"]}}
-                }
-                with yt_dlp.YoutubeDL(fallback_opts) as ydl:
-                    info = ydl.extract_info(url, download=False)
-                    if info and "url" in info:
-                        return info, info["url"]
-                    elif info and "formats" in info:
-                        for f in info["formats"]:
-                            if f.get("acodec") != "none":
-                                return info, f["url"]
-            except:
-                pass
+        else:
             raise RuntimeError(f"YouTube error: {error_msg[:150]}")
     except Exception as e:
         raise RuntimeError(f"Failed: {str(e)[:100]}")
