@@ -236,26 +236,32 @@ async def update_embeds():
             print(f"Embed update error: {e}")
 
 # ============================================================
-# YT-DLP OPTIONS
+# YT-DLP OPTIONS - FIXED FOR YOUTUBE BLOCKING
 # ============================================================
 
 def get_ytdl_options():
     opts = {
-        "format": "bestaudio/best",
+        "format": "bestaudio[ext=m4a]/bestaudio/best",
         "quiet": True,
         "no_warnings": False,
         "noplaylist": True,
         "extract_flat": False,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android"],
-                "skip": ["dash", "hls"]
+                "player_client": ["android", "ios", "web_creator", "tv_embedded"],
+                "skip": ["dash", "hls"],
+                "pot": ["disabled"]
             }
         },
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "m4a",
+        }],
         "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
         "headers": {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
         },
         "socket_timeout": 30,
         "retries": 10,
@@ -267,7 +273,7 @@ def get_ytdl_options():
         opts["cookiefile"] = COOKIE_FILE
         print(f"[YT-DLP] ✅ Cookies loaded")
     else:
-        print(f"[YT-DLP] ⚠️ No cookies file found")
+        print(f"[YT-DLP] ⚠️ No cookies file found - using no-cookies mode")
     
     return opts
 
@@ -300,9 +306,14 @@ def create_source(url: str):
                 audio_url = info["url"]
             elif "formats" in info:
                 for f in info["formats"]:
-                    if f.get("acodec") != "none" and f.get("vcodec") == "none":
+                    if f.get("acodec") != "none" and f.get("vcodec") == "none" and f.get("ext") == "m4a":
                         audio_url = f["url"]
                         break
+                if not audio_url:
+                    for f in info["formats"]:
+                        if f.get("acodec") != "none" and f.get("vcodec") == "none":
+                            audio_url = f["url"]
+                            break
                 if not audio_url:
                     for f in info["formats"]:
                         if f.get("acodec") != "none":
@@ -317,6 +328,32 @@ def create_source(url: str):
             print(f"[YT-DLP] ✅ Extracted: {info.get('title', 'Unknown')}")
             return info, audio_url
             
+    except yt_dlp.utils.DownloadError as e:
+        error_msg = str(e)
+        if "Sign in to confirm" in error_msg or "cookies" in error_msg.lower():
+            raise RuntimeError("⚠️ Age-restricted. Try using cookies.txt or a different video.")
+        elif "Video unavailable" in error_msg:
+            raise RuntimeError("❌ Video is unavailable. Try another.")
+        elif "SABR" in error_msg:
+            # Fallback to basic extraction
+            try:
+                fallback_opts = {
+                    "format": "bestaudio",
+                    "quiet": True,
+                    "noplaylist": True,
+                    "extractor_args": {"youtube": {"player_client": ["web"]}}
+                }
+                with yt_dlp.YoutubeDL(fallback_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    if info and "url" in info:
+                        return info, info["url"]
+                    elif info and "formats" in info:
+                        for f in info["formats"]:
+                            if f.get("acodec") != "none":
+                                return info, f["url"]
+            except:
+                pass
+            raise RuntimeError(f"YouTube error: {error_msg[:150]}")
     except Exception as e:
         raise RuntimeError(f"Failed: {str(e)[:100]}")
 
