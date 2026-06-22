@@ -5,6 +5,7 @@ import wavelink
 import asyncio
 import sys
 
+print("=== MAIN.PY VERSION: v5 - Lavalink in on_ready ===")
 print("🚀 Script starting...")
 print(f"Python version: {sys.version}")
 
@@ -33,7 +34,7 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Sync failed: {e}")
 
-    # Lavalink connection moved here for reliability
+    # Connect to Lavalink
     print("🔄 Connecting to Lavalink from on_ready...")
     retries = 0
     max_retries = 10
@@ -55,8 +56,7 @@ async def on_ready():
     else:
         print("❌ Failed to connect to Lavalink after all retries.")
 
-# ==================== SLASH COMMANDS ====================
-
+# Slash Commands
 @bot.tree.command(name="join", description="Join your voice channel")
 async def slash_join(interaction: discord.Interaction):
     if not interaction.user.voice:
@@ -94,52 +94,6 @@ async def slash_play(interaction: discord.Interaction, query: str):
         await interaction.followup.send(f"▶️ Now playing: **{track.title}**")
     except Exception as e:
         await interaction.followup.send(f"❌ Error: {str(e)}")
-
-@bot.tree.command(name="skip", description="Skip current song")
-async def slash_skip(interaction: discord.Interaction):
-    vc = interaction.guild.voice_client
-    if vc and vc.current:
-        await vc.stop()
-        await interaction.response.send_message("⏭️ Skipped!")
-    else:
-        await interaction.response.send_message("❌ Nothing to skip", ephemeral=True)
-
-@bot.tree.command(name="pause", description="Pause current song")
-async def slash_pause(interaction: discord.Interaction):
-    vc = interaction.guild.voice_client
-    if vc and vc.current and not vc.paused:
-        await vc.pause()
-        await interaction.response.send_message("⏸️ Paused")
-    else:
-        await interaction.response.send_message("❌ Nothing to pause", ephemeral=True)
-
-@bot.tree.command(name="resume", description="Resume current song")
-async def slash_resume(interaction: discord.Interaction):
-    vc = interaction.guild.voice_client
-    if vc and vc.current and vc.paused:
-        await vc.resume()
-        await interaction.response.send_message("▶️ Resumed")
-    else:
-        await interaction.response.send_message("❌ Nothing to resume", ephemeral=True)
-
-@bot.tree.command(name="stop", description="Stop playback and clear queue")
-async def slash_stop(interaction: discord.Interaction):
-    vc = interaction.guild.voice_client
-    if vc:
-        await vc.stop()
-        await vc.disconnect()
-        await interaction.response.send_message("⏹️ Stopped and disconnected")
-    else:
-        await interaction.response.send_message("❌ Not in voice", ephemeral=True)
-
-@bot.tree.command(name="leave", description="Leave voice channel")
-async def slash_leave(interaction: discord.Interaction):
-    vc = interaction.guild.voice_client
-    if vc:
-        await vc.disconnect()
-        await interaction.response.send_message("👋 Left voice channel")
-    else:
-        await interaction.response.send_message("❌ Not in voice", ephemeral=True)
 
 @bot.tree.command(name="status", description="Check bot and Lavalink status")
 async def slash_status(interaction: discord.Interaction):
