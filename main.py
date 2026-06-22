@@ -12,10 +12,10 @@ if not TOKEN:
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Lavalink connection info (Railway domain + port)
+# Lavalink connection info (Railway domain + port 8080)
 LAVALINK_URI = os.getenv(
     "LAVALINK_URI",
-    "http://discord-music-bot-production-340f.up.railway.app:2333"
+    "http://discord-music-bot-production-340f.up.railway.app:8080"
 )
 LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD", "youshallnotpass")
 
@@ -38,6 +38,7 @@ async def setup_hook():
         node = wavelink.Node(
             uri=LAVALINK_URI,
             password=LAVALINK_PASSWORD,
+            secure=False,   # force plain HTTP
             timeout=30
         )
         await wavelink.Pool.connect(client=bot, nodes=[node])
