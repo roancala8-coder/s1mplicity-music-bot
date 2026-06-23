@@ -72,14 +72,14 @@ async def test_lavalink(ctx):
     except Exception as e:
         await ctx.send(f"❌ Wavelink check failed: {e}")
     
-    # Try to ping Lavalink directly
+    # Try to ping Lavalink with authentication
     try:
         async with aiohttp.ClientSession() as session:
-            # Try the /version endpoint
+            headers = {"Authorization": LAVALINK_PASSWORD}
             url = f"{LAVALINK_URI}/version"
             await ctx.send(f"🌐 Testing HTTP connection to: {url}")
             try:
-                async with session.get(url, timeout=5) as resp:
+                async with session.get(url, headers=headers, timeout=5) as resp:
                     if resp.status == 200:
                         version = await resp.text()
                         await ctx.send(f"✅ Lavalink is reachable! Version: {version[:50]}")
