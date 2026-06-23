@@ -1,10 +1,10 @@
 server:
-  port: 2333
-  address: 0.0.0.0
+  port: ${PORT:8080}      # Use Railway's injected port (usually 8080)
+  address: 0.0.0.0        # Bind to all interfaces
 
 lavalink:
   server:
-    password: "youshallnotpass"   # Change this
+    password: "youshallnotpass"   # Must match Peaceful Spirit variable
     sources:
       youtube: true
       soundcloud: true
