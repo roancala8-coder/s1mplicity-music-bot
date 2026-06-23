@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 import wavelink
 
-print("=== MAIN.PY VERSION: v9 - Stable Lavalink ===")
+print("=== MAIN.PY VERSION: v10 - Stable Lavalink ===")
 print("🚀 Script starting...")
 print(f"Python version: {sys.version}")
 
@@ -33,7 +33,7 @@ class MusicBot(commands.Bot):
                 password=LAVALINK_PASSWORD,
                 secure=False  # critical: Lavalink only speaks HTTP
             )
-            await wavelink.Pool.connect(client=self, nodes=[node])
+            await wavelink.NodePool.connect(client=self, nodes=[node])
             print("🎉 Lavalink connected successfully!")
         except Exception as e:
             print(f"❌ Lavalink connection failed: {e}")
@@ -55,7 +55,7 @@ async def on_ready():
 async def slash_status(interaction: discord.Interaction):
     status = "✅ Bot is running\n"
     try:
-        if len(wavelink.Pool.nodes) > 0:
+        if len(wavelink.NodePool.nodes) > 0:
             status += "🔊 Lavalink Connected"
         else:
             status += "❌ Lavalink Not Connected"
