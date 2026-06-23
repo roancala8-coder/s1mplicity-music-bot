@@ -9,20 +9,17 @@ print("=== MAIN.PY VERSION: v10 - Stable Lavalink ===")
 print("🚀 Script starting...")
 print(f"Python version: {sys.version}")
 
-# Grab token from Railway environment
 TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:
     raise ValueError("❌ DISCORD_TOKEN environment variable not set")
 
-# Enable all intents
 intents = discord.Intents.all()
 
 class MusicBot(commands.Bot):
     async def setup_hook(self):
-        # Lavalink connection details from Railway env vars
         LAVALINK_URI = os.getenv(
             "LAVALINK_URI",
-            "http://discord-music-bot-production-363a.up.railway.app:8080"  # fallback
+            "http://discord-music-bot-production-363a.up.railway.app:8080"
         )
         LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD", "youshallnotpass")
 
@@ -31,14 +28,13 @@ class MusicBot(commands.Bot):
             node = wavelink.Node(
                 uri=LAVALINK_URI,
                 password=LAVALINK_PASSWORD,
-                secure=False  # critical: Lavalink only speaks HTTP
+                secure=False
             )
             await wavelink.NodePool.connect(client=self, nodes=[node])
             print("🎉 Lavalink connected successfully!")
         except Exception as e:
             print(f"❌ Lavalink connection failed: {e}")
 
-# Create bot instance
 bot = MusicBot(command_prefix="!", intents=intents)
 
 @bot.event
@@ -50,7 +46,6 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Sync failed: {e}")
 
-# Slash command: status
 @bot.tree.command(name="status", description="Check bot and Lavalink status")
 async def slash_status(interaction: discord.Interaction):
     status = "✅ Bot is running\n"
@@ -63,7 +58,6 @@ async def slash_status(interaction: discord.Interaction):
         status += f"❌ Lavalink Check Failed ({e})"
     await interaction.response.send_message(status, ephemeral=True)
 
-# Slash command: join
 @bot.tree.command(name="join", description="Join your voice channel")
 async def slash_join(interaction: discord.Interaction):
     if not interaction.user.voice:
@@ -75,5 +69,4 @@ async def slash_join(interaction: discord.Interaction):
     except Exception as e:
         await interaction.response.send_message(f"❌ Failed to join: {str(e)}", ephemeral=True)
 
-# Run bot
 bot.run(TOKEN)
