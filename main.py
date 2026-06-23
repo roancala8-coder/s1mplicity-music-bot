@@ -4,8 +4,9 @@ from discord.ext import commands
 import wavelink
 import asyncio
 import sys
+import aiohttp
 
-print("=== MAIN.PY VERSION: v5 - Lavalink in on_ready ===")
+print("=== MAIN.PY VERSION: v6 - Lavalink with Test Command ===")
 print("🚀 Script starting...")
 print(f"Python version: {sys.version}")
 
@@ -56,7 +57,43 @@ async def on_ready():
     else:
         print("❌ Failed to connect to Lavalink after all retries.")
 
-# Slash Commands
+@bot.command(name="testlavalink")
+async def test_lavalink(ctx):
+    """Test Lavalink connection"""
+    await ctx.send(f"🔗 Trying to connect to: {LAVALINK_URI}")
+    await ctx.send(f"🔑 Password: {'*' * len(LAVALINK_PASSWORD)}")
+    
+    # Check if wavelink is connected
+    try:
+        if len(wavelink.Pool.nodes) > 0:
+            await ctx.send("✅ Wavelink Pool has nodes connected!")
+        else:
+            await ctx.send("❌ Wavelink Pool has NO nodes connected")
+    except Exception as e:
+        await ctx.send(f"❌ Wavelink check failed: {e}")
+    
+    # Try to ping Lavalink directly
+    try:
+        async with aiohttp.ClientSession() as session:
+            # Try the /version endpoint
+            url = f"{LAVALINK_URI}/version"
+            await ctx.send(f"🌐 Testing HTTP connection to: {url}")
+            try:
+                async with session.get(url, timeout=5) as resp:
+                    if resp.status == 200:
+                        version = await resp.text()
+                        await ctx.send(f"✅ Lavalink is reachable! Version: {version[:50]}")
+                    else:
+                        await ctx.send(f"❌ Lavalink returned status: {resp.status}")
+            except aiohttp.ClientConnectorError:
+                await ctx.send(f"❌ Cannot connect to {url} - Host unreachable")
+            except aiohttp.ClientResponseError as e:
+                await ctx.send(f"❌ HTTP Error: {e}")
+            except Exception as e:
+                await ctx.send(f"❌ Connection error: {type(e).__name__} - {e}")
+    except Exception as e:
+        await ctx.send(f"❌ Session error: {e}")
+
 @bot.tree.command(name="join", description="Join your voice channel")
 async def slash_join(interaction: discord.Interaction):
     if not interaction.user.voice:
