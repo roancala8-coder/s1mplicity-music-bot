@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 import wavelink
 
-print("=== MAIN.PY VERSION: v8 - Lavalink SetupHook ===")
+print("=== MAIN.PY VERSION: v9 - Lavalink Fixed ===")
 print("🚀 Script starting...")
 print(f"Python version: {sys.version}")
 
@@ -17,14 +17,16 @@ intents = discord.Intents.all()
 
 class MusicBot(commands.Bot):
     async def setup_hook(self):
-        LAVALINK_URI = os.getenv("LAVALINK_URI", "http://discord-music-bot-production-363a.up.railway.app:2333")
+        # Use Railway env vars, fallback to correct port 8080
+        LAVALINK_URI = os.getenv("LAVALINK_URI", "http://discord-music-bot-production-363a.up.railway.app:8080")
         LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD", "youshallnotpass")
 
         print(f"🔗 Connecting to Lavalink: {LAVALINK_URI}")
         try:
             node = wavelink.Node(
                 uri=LAVALINK_URI,
-                password=LAVALINK_PASSWORD
+                password=LAVALINK_PASSWORD,
+                secure=False  # critical: Lavalink only speaks HTTP
             )
             await wavelink.Pool.connect(client=self, nodes=[node])
             print("🎉 Lavalink connected successfully!")
@@ -65,24 +67,5 @@ async def slash_join(interaction: discord.Interaction):
     except Exception as e:
         await interaction.response.send_message(f"❌ Failed to join: {str(e)}", ephemeral=True)
 
-@bot.tree.command(name="play", description="Play a song from YouTube")
-async def slash_play(interaction: discord.Interaction, query: str):
-    await interaction.response.defer(thinking=True)
-    if not interaction.user.voice:
-        await interaction.followup.send("❌ You need to be in a voice channel!")
-        return
-    vc = interaction.guild.voice_client
-    if not vc:
-        vc = await interaction.user.voice.channel.connect(cls=wavelink.Player)
-    try:
-        tracks = await wavelink.Playable.search(query, source="youtube")
-        if not tracks:
-            await interaction.followup.send("❌ No tracks found!")
-            return
-        track = tracks[0]
-        await vc.play(track)
-        await interaction.followup.send(f"▶️ Now playing: **{track.title}**")
-    except Exception as e:
-        await interaction.followup.send(f"❌ Error: {str(e)}")
-
+# Run the bot
 bot.run(TOKEN)
