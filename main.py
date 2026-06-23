@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 import wavelink
 
-print("=== MAIN.PY VERSION: v7 - Lavalink SetupHook ===")
+print("=== MAIN.PY VERSION: v8 - Lavalink SetupHook ===")
 print("🚀 Script starting...")
 print(f"Python version: {sys.version}")
 
@@ -14,20 +14,18 @@ if not TOKEN:
     raise ValueError("❌ DISCORD_TOKEN environment variable not set")
 
 intents = discord.Intents.all()
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-LAVALINK_URI = os.getenv("LAVALINK_URI", "http://discord-music-bot-production-363a.up.railway.app:2333")
-LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD", "youshallnotpass")
 
 class MusicBot(commands.Bot):
     async def setup_hook(self):
+        LAVALINK_URI = os.getenv("LAVALINK_URI", "http://discord-music-bot-production-363a.up.railway.app:2333")
+        LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD", "youshallnotpass")
+
         print(f"🔗 Connecting to Lavalink: {LAVALINK_URI}")
-        node = wavelink.Node(
-            uri=LAVALINK_URI,
-            password=LAVALINK_PASSWORD,
-            secure=False
-        )
         try:
+            node = wavelink.Node(
+                uri=LAVALINK_URI,
+                password=LAVALINK_PASSWORD
+            )
             await wavelink.Pool.connect(client=self, nodes=[node])
             print("🎉 Lavalink connected successfully!")
         except Exception as e:
